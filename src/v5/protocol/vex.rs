@@ -1,6 +1,5 @@
 use std::io::{Read, Write};
 use anyhow::{Result, anyhow};
-use num_derive::FromPrimitive;
 use std::time::{Duration, SystemTime};
 use crc::Algorithm;
 
@@ -23,10 +22,29 @@ pub enum VexDeviceType {
     Unknown
 }
 
+#[derive(Debug, Clone, Copy, FromPrimitive, ToPrimitive, PartialEq)]
+#[repr(u8)]
+pub enum VexACKType {
+    ACK = 0x76,
+    NACK_CRC_ERROR = 0xCE,
+    NACK_PAYLOAD_SHORT = 0xD0,
+    NACK_TRANSFER_SIZE_TOO_LARGE = 0xD1,
+    NACK_PROGRAM_CRC_FAILED = 0xD2,
+    NACK_PROGRAM_FILE_ERROR = 0xD3,
+    NACK_UNINITIALIZED_TRANSFER = 0xD4,
+    NACK_INITIALIZATION_INVALID = 0xD5,
+    NACK_LENGTH_MOD_FOUR_NZERO = 0xD6,
+    NACK_ADDR_NO_MATCH = 0xD7,
+    NACK_DOWNLOAD_LENGTH_NO_MATCH = 0xD8,
+    NACK_DIRECTORY_NO_EXIST = 0xD9,
+    NACK_NO_FILE_ROOM = 0xDA,
+    NACK_FILE_ALREADY_EXISTS = 0xDB,
+}
+
 
 /// Represents a vex device command
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, FromPrimitive)]
+#[derive(Debug, Clone, Copy, FromPrimitive, ToPrimitive)]
 pub enum VexDeviceCommand {
     ExecuteFile = 0x18,
     Extended = 0x56,
@@ -39,7 +57,11 @@ impl PartialEq<u8> for VexDeviceCommand {
         *self as u8 == *other
     }
 }
-
+impl PartialEq<VexDeviceCommand> for VexDeviceCommand {
+    fn eq(&self, other: &VexDeviceCommand) -> bool {
+        *self as u8 == *other as u8
+    }
+}
 impl PartialEq<VexDeviceCommand> for u8 {
     fn eq(&self, other: &VexDeviceCommand) -> bool {
         *self == *other as u8
@@ -66,6 +88,48 @@ impl<T> VexProtocolWrapper<T>
         }
     }
 
+    /// Receives an extended packet from the vex device
+    pub fn receive_extended(&mut self, timeout: Option<Duration>) -> Result<(VexDeviceCommand, Vec<u8>, Vec<u8>)> {
+        
+        // Receive simple data
+        let data = self.receive_simple(timeout)?;
+        
+        let crc = crc::Crc::<u16>::new(&VEX_CRC16);
+
+        // Check the crc of the entirety of the recieved data
+        let chk = crc.checksum(&data.2);
+        if chk != 0 {
+            return Err(anyhow!("CRC failed on response."))
+        }
+
+        // Verify that this is an extended command
+        if data.0 != VexDeviceCommand::Extended {
+            return Err(anyhow!("Unexpected packet recieved from device. Expected Extended, got other"));
+        }
+
+        // Get the ack result
+        let ack = data.1[0];
+
+        // Try to turn the ack into a member of the enum
+        let ack: VexACKType = match num::FromPrimitive::from_u8(ack) {
+            Some(a) => a,
+            None => {
+                return Err(anyhow!("Device did not ack with unknown response {}", ack));
+            }
+        };
+
+        // If it is not an ACK, and we are not exited by now
+        // than it is a NACK
+        if ack != VexACKType::ACK {
+            return Err(anyhow!("Device NACKED with response {:02x}", ack as u8));
+        }
+        
+        // Strip out the payload
+        let payload = Vec::from(&data.1[1..]);
+
+        Ok((VexDeviceCommand::Extended, payload, data.2))
+    }
+
     /// Sends an extended packet to the vex device
     pub fn send_extended(&mut self, command: VexDeviceCommand, data: Vec<u8>) -> Result<usize> {
         
@@ -76,10 +140,8 @@ impl<T> VexProtocolWrapper<T>
         self.send_simple(VexDeviceCommand::Extended, payload)
     }
 
-    
-
     /// Receives a simple packet from the vex device
-    pub fn receive_simple(&mut self, timeout: Option<Duration>) -> Result<(VexDeviceCommand, Vec<u8>)> {
+    pub fn receive_simple(&mut self, timeout: Option<Duration>) -> Result<(VexDeviceCommand, Vec<u8>, Vec<u8>)> {
 
         // Use default timeout if none was provided
         let timeout = match timeout {
@@ -87,6 +149,7 @@ impl<T> VexProtocolWrapper<T>
             None => Duration::new(0,100000000)
         };
 
+        
 
         // This is the expected header in the response:
         let expected_header: [u8;2] = [0xAA,0x55];
@@ -95,8 +158,10 @@ impl<T> VexProtocolWrapper<T>
         // Set the duration for the next timeout
         let then = SystemTime::now() + timeout;
 
+        
+
         // Iterate over recieving single bytes untill we recieve the header
-        while header_index < 3 {
+        while header_index < 2 {
             // Recieve a single byte
             let mut b: [u8; 1] = [0];
             self.wraps.read_exact(&mut b)?;
@@ -115,6 +180,10 @@ impl<T> VexProtocolWrapper<T>
             }
         }
 
+        // Create a variable containing the entire response recieved
+        let mut rx = Vec::from(expected_header);
+
+        
         // Read in the next two bytes
         let mut buf: [u8; 2] = [0, 0];
         self.wraps.read_exact(&mut buf)?;
@@ -122,12 +191,15 @@ impl<T> VexProtocolWrapper<T>
         // Extract the command and the length of the packet
         let command = buf[0];
         let mut length: u16 = buf[1].into();
+
+        rx.extend(buf);
         
         // If this is an extended command
         if command == VexDeviceCommand::Extended {
             // Then extract the lower byte of the length
             let mut b: [u8; 1] = [0];
             self.wraps.read_exact(&mut b)?;
+            rx.extend(b);
 
             let b: u16 = b[0].into();
 
@@ -139,6 +211,7 @@ impl<T> VexProtocolWrapper<T>
         // Read in the rest of the payload
         let mut payload: Vec<u8> = vec![0; length.into()];
         self.wraps.read(&mut payload)?; // We do not care about size here. Some commands may send less data than needed.
+        rx.extend(payload.clone());
 
         // Try to convert the command into it's enum format
         let command: VexDeviceCommand =  match num::FromPrimitive::from_u8(command) {
@@ -149,7 +222,7 @@ impl<T> VexProtocolWrapper<T>
         };
         
         // Return the command and the payload
-        Ok((command, payload))
+        Ok((command, payload, rx))
     }
 
     /// Sends a simple packet to the vex device
@@ -162,7 +235,6 @@ impl<T> VexProtocolWrapper<T>
         packet.append(&mut data.clone());
         
         
-        println!("{:?}", packet);
         // Write the data
         self.wraps.write_all(&mut packet)?;
         
@@ -184,11 +256,11 @@ impl<T> VexProtocolWrapper<T>
     }
 
     /// Creates an extended packet
-    fn create_extended_packet(&self, msg: VexDeviceCommand, payload: Vec<u8>) -> Result<Vec<u8>> {
+    fn create_extended_packet(&self, command: VexDeviceCommand, payload: Vec<u8>) -> Result<Vec<u8>> {
 
         let mut packet = Vec::<u8>::new();
 
-        packet.push(msg as u8);
+        packet.push(command as u8);
 
         // Cache this value because it will not change.
         let payload_length: u16 = payload.len().try_into()?;
@@ -219,11 +291,6 @@ impl<T> VexProtocolWrapper<T>
         // Pack the crc into the packet
         packet.push(calc.checked_shr(8).unwrap_or(0) as u8);
         packet.push((calc & 0xff) as u8);
-        println!("{:?}", calc.to_le_bytes());
-        let c = crc.checksum(&vec![201, 54, 184, 71, 86, 24, 26, 1, 0, 115, 108, 111, 116, 95, 49, 46, 98, 105, 110, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-        println!("{}", c);
-        println!("{}", calc);
-        
         
 
         Ok(packet)
