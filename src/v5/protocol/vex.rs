@@ -1,54 +1,13 @@
 use std::io::{Read, Write};
 use anyhow::{Result, anyhow};
 use std::time::{Duration, SystemTime};
-use crc::Algorithm;
-
-/// Vex uses CRC16/XMODEM as the CRC16.
-const VEX_CRC16: Algorithm<u16> = Algorithm {
-    poly: 0x1021,
-    init: 0x0000,
-    refin: false,
-    refout: false,
-    xorout: 0x0000,
-    check: 0x31c3,
-    residue: 0x0000,
+use crate::v5::protocol::{
+    VEX_CRC16,
+    VexDeviceCommand,
+    VexDeviceType,
+    VexACKType
 };
 
-/// Represents the type of a vex device
-pub enum VexDeviceType {
-    User,
-    System,
-    Joystick,
-    Unknown
-}
-
-#[derive(Debug, Clone, Copy, FromPrimitive, ToPrimitive, PartialEq)]
-#[repr(u8)]
-pub enum VexACKType {
-    ACK = 0x76,
-    NACK_CRC_ERROR = 0xCE,
-    NACK_PAYLOAD_SHORT = 0xD0,
-    NACK_TRANSFER_SIZE_TOO_LARGE = 0xD1,
-    NACK_PROGRAM_CRC_FAILED = 0xD2,
-    NACK_PROGRAM_FILE_ERROR = 0xD3,
-    NACK_UNINITIALIZED_TRANSFER = 0xD4,
-    NACK_INITIALIZATION_INVALID = 0xD5,
-    NACK_LENGTH_MOD_FOUR_NZERO = 0xD6,
-    NACK_ADDR_NO_MATCH = 0xD7,
-    NACK_DOWNLOAD_LENGTH_NO_MATCH = 0xD8,
-    NACK_DIRECTORY_NO_EXIST = 0xD9,
-    NACK_NO_FILE_ROOM = 0xDA,
-    NACK_FILE_ALREADY_EXISTS = 0xDB,
-}
-
-
-/// Represents a vex device command
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, FromPrimitive, ToPrimitive)]
-pub enum VexDeviceCommand {
-    ExecuteFile = 0x18,
-    Extended = 0x56,
-}
 
 
 
@@ -71,6 +30,7 @@ impl PartialEq<VexDeviceCommand> for u8 {
 
 /// Wraps any struct that implements both read and write
 /// traits. Allows sending vex device commands. 
+#[derive(Clone, Debug)]
 pub struct VexProtocolWrapper<T> 
     where T: Read + Write {
     device_type: VexDeviceType,
@@ -265,7 +225,7 @@ impl<T> VexProtocolWrapper<T>
         // Cache this value because it will not change.
         let payload_length: u16 = payload.len().try_into()?;
 
-        // If we are larger than an 8-bit signed integer
+        // If the packet is larger than an 8-bit signed integer
         // then split the length into two halves
         if payload_length > 0x80 {
             packet.extend(payload_length.to_le_bytes())
