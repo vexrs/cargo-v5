@@ -4,14 +4,14 @@ use num_derive::FromPrimitive;
 use std::time::{Duration, SystemTime};
 use crc::Algorithm;
 
-
+/// Vex uses CRC16/XMODEM as the CRC16.
 const VEX_CRC16: Algorithm<u16> = Algorithm {
     poly: 0x1021,
-    init: 0xffff,
+    init: 0x0000,
     refin: false,
     refout: false,
     xorout: 0x0000,
-    check: 0xe5cc,
+    check: 0x31c3,
     residue: 0x0000,
 };
 
@@ -75,6 +75,7 @@ impl<T> VexProtocolWrapper<T>
         // Send the payload and return the length of the data sent
         self.send_simple(VexDeviceCommand::Extended, payload)
     }
+
     
 
     /// Receives a simple packet from the vex device
@@ -190,13 +191,14 @@ impl<T> VexProtocolWrapper<T>
         packet.push(msg as u8);
 
         // Cache this value because it will not change.
-        let payload_length: u8 = payload.len().try_into()?;
+        let payload_length: u16 = payload.len().try_into()?;
 
         // If we are larger than an 8-bit signed integer
         // then split the length into two halves
         if payload_length > 0x80 {
-            packet.push((payload_length.checked_shr(8).unwrap_or(0)) | 0x80);
-            packet.push(payload_length & 0xff);
+            packet.extend(payload_length.to_le_bytes())
+        } else {
+            packet.push(payload_length as u8);
         }
 
         // Add the payload
@@ -212,11 +214,15 @@ impl<T> VexProtocolWrapper<T>
         let crc = crc::Crc::<u16>::new(&VEX_CRC16);
         let mut digest = crc.digest();
         digest.update(&payload_proper);
-        let crc = digest.finalize();
+        let calc = digest.finalize();
 
         // Pack the crc into the packet
-        packet.push(crc.checked_shr(8).unwrap_or(0) as u8);
-        packet.push((crc & 0xff) as u8);
+        packet.push(calc.checked_shr(8).unwrap_or(0) as u8);
+        packet.push((calc & 0xff) as u8);
+        println!("{:?}", calc.to_le_bytes());
+        let c = crc.checksum(&vec![201, 54, 184, 71, 86, 24, 26, 1, 0, 115, 108, 111, 116, 95, 49, 46, 98, 105, 110, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        println!("{}", c);
+        println!("{}", calc);
         
         
 
