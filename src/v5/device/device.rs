@@ -14,7 +14,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use anyhow::{Result, anyhow};
 use ascii::{AsciiString, AsAsciiStr};
-use super::{VexVID, VexFileMetadata};
+use super::{VexVID, VexFileMetadata, V5ControllerChannel};
 
 
 
@@ -28,7 +28,8 @@ pub struct V5FileHandle<'a, T>
     pub metadata: VexInitialFileMetadata,
     pub file_name: AsciiString,
     position: usize,
-    wraps: &'a VexV5Device<T>
+    wraps: &'a VexV5Device<T>,
+    timeout: Option<std::time::Duration>,
 }
 
 impl<'a, T: Write + Read> V5FileHandle<'a, T> {
@@ -40,7 +41,7 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         self.device.borrow_mut().send_extended(VexDeviceCommand::ExitFile, Vec::<u8>::from([0b11u8]))?;
 
         // Get the response
-        let response = self.device.borrow_mut().receive_extended(None, ResponseCheckFlags::ALL)?;
+        let response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
         
         // Return the response data
         Ok(response.1)
@@ -69,7 +70,7 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         self.device.borrow_mut().send_extended(VexDeviceCommand::ReadFile, payload)?;
 
         // Get the response
-        let response = self.device.borrow_mut().receive_extended(None, ResponseCheckFlags::NONE)?;
+        let response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::NONE)?;
 
         // Cut out the unneeded data
         let ret = response.1[..n_bytes.into()].to_vec();
@@ -98,7 +99,7 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
 
 
         // Recieve response
-        let _response = self.device.borrow_mut().receive_extended(Some(std::time::Duration::new(2,0)), ResponseCheckFlags::ALL)?;
+        let _response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
 
         Ok(())
     }
@@ -112,7 +113,8 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
 /// to provide high-level access to the VEX device.
 #[derive(Clone, Debug)]
 pub struct VexV5Device<T: Write + Read> {
-    wraps: Rc<RefCell<VexProtocolWrapper<T>>>
+    wraps: Rc<RefCell<VexProtocolWrapper<T>>>,
+    timeout: Option<std::time::Duration>
 }
 
 /// This trait contains functions that all vex v5 devices have
@@ -121,9 +123,33 @@ impl<T: Write + Read> VexV5Device<T> {
 
     /// Initializes a new device
     pub fn new(wraps: VexProtocolWrapper<T>) -> VexV5Device<T> {
-        VexV5Device {
-            wraps: Rc::new(RefCell::new(wraps))
-        }
+
+        let mut dev = VexV5Device {
+            wraps: Rc::new(RefCell::new(wraps)),
+            timeout: None
+        };
+    
+        // Set our default timeout based on wireless status
+        dev.timeout  = if dev.is_wireless().unwrap_or(false) {
+            Some(std::time::Duration::new(5,0))
+        } else {
+            None
+        };
+
+        dev
+    }
+        
+
+    /// Switches the channel if this is a controller.
+    pub fn switch_channel(&mut self, channel: Option<V5ControllerChannel>) -> Result<()> {
+
+        // If the channel is none, then switch back to pit
+        let channel = channel.unwrap_or(V5ControllerChannel::PIT);
+
+        // Send the command
+        self.wraps.borrow_mut().send_extended(VexDeviceCommand::SwitchChannel, Vec::<u8>::from([channel as u8]))?;
+
+        Ok(())
     }
 
     /// Gets the version of the device
@@ -181,6 +207,8 @@ impl<T: Write + Read> VexV5Device<T> {
 
     /// Opens a file handle on the v5 device
     pub fn open(&mut self, file_name: String, file_metadata: Option<VexInitialFileMetadata>) -> Result<V5FileHandle<T>> {
+
+        
 
         // Convert the file name to a zero-terminated string 24 bytes long
         let mut file_name_bytes = [0u8; 24];
@@ -241,7 +269,7 @@ impl<T: Write + Read> VexV5Device<T> {
         // Make the request
         self.wraps.borrow_mut().send_extended(VexDeviceCommand::OpenFile, data)?;
         
-        let recv = self.wraps.borrow_mut().receive_extended(None, ResponseCheckFlags::ALL)?;
+        let recv = self.wraps.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
         
         // Unpack the payload
         let recv: VexFiletransferMetadata = bincode::deserialize(&recv.1)?;
@@ -260,7 +288,7 @@ impl<T: Write + Read> VexV5Device<T> {
             self.wraps.borrow_mut().send_extended(VexDeviceCommand::SetLinkedFilename, payload)?;
 
             // Recieve and discard response
-            self.wraps.borrow_mut().receive_extended(None, ResponseCheckFlags::ALL)?;
+            self.wraps.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
         }
 
         // Create the file handle
@@ -270,7 +298,8 @@ impl<T: Write + Read> VexV5Device<T> {
             metadata,
             file_name: file_name_ascii.to_ascii_string(),
             position: 0,
-            wraps: self
+            wraps: self,
+            timeout: self.timeout,
         })
     }
 
@@ -282,7 +311,8 @@ impl<T: Write + Read> VexV5Device<T> {
         // If it is a controller and connected wirelessly then return true
         // if not, we are not using wireless
         match info.product_type {
-            VexProduct::V5Controller(f) => Ok(f.contains(V5ControllerFlags::CONNECTED_WIRELESS)),
+            VexProduct::V5Controller(f) => Ok(f.contains(V5ControllerFlags::CONNECTED_WIRELESS) ||
+                            f.contains(V5ControllerFlags::CONNECTED_CABLE)),
             _ => Ok(false)
         }
     }

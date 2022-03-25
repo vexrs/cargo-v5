@@ -8,7 +8,7 @@ use vex_v5_serial::v5::protocol::{
     vex::VexProtocolWrapper
 };
 use vex_v5_serial::v5::device::{VexV5Device, VexInitialFileMetadata, VexFileMode, VexFileTarget,
-    VexVID};
+    VexVID, V5ControllerChannel};
 use anyhow::Result;
 
 
@@ -16,7 +16,7 @@ use anyhow::Result;
 fn main() -> Result<()>{
     let port = serialport::new("/dev/ttyACM0", 115200)
         .parity(serialport::Parity::None)
-        .timeout(std::time::Duration::new(0,100000000))
+        .timeout(std::time::Duration::new(5,0))// We handle our own timeouts so a long timeout on the serial side is required.
         .stop_bits(serialport::StopBits::One).open()?;
 
     let wrapper = VexProtocolWrapper::new(VexDeviceType::System, port);
@@ -28,11 +28,13 @@ fn main() -> Result<()>{
 
     
 
-    let data = Vec::<u8>::from(*b"Hello, Culpeper Team!");
+    let data = Vec::<u8>::from(*b"Hello, Culpeper Team 7122A!");
 
     // Grab a crc32 of the data
     let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&data);
     println!("test crc32: {:x}", crc32);
+
+    device.switch_channel(Some(V5ControllerChannel::DOWNLOAD))?;
 
     // Open a test file
     let mut file = device.open(file_name.to_string(), Some(VexInitialFileMetadata {
@@ -49,22 +51,24 @@ fn main() -> Result<()>{
 
     
 
-     
-    let buf = file.read_range(0, 25)?;
+    
+    let buf = file.read_range(0x0, 10)?;
     println!("{:?}", buf);
 
     // Convert buf to string
     let s = ascii::AsciiStr::from_ascii(&buf)?.to_string();
-    println!("{}",s);
+    println!("{}",s); 
     
 
     //file.write_position(0x3800000, data)?;
     
     file.close()?;
 
+    device.switch_channel(Some(V5ControllerChannel::PIT))?;
+
     // Get the metadata
-    //let metadata = device.get_file_metadata(file_name.to_string(), None, None)?;
-    //println!("{:?}", metadata);
+    let metadata = device.get_file_metadata(file_name.to_string(), None, None)?;
+    println!("{:?}", metadata);
 
 
     drop(device);

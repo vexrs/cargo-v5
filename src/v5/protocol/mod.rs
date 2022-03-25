@@ -52,6 +52,7 @@ pub enum VexACKType {
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, FromPrimitive, ToPrimitive)]
 pub enum VexDeviceCommand {
+    SwitchChannel = 0x10,
     OpenFile = 0x11,
     ExitFile = 0x12,
     WriteFile = 0x13,

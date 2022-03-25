@@ -163,7 +163,10 @@ pub enum V5ControllerChannel {
     /// Used when wirelessly controlling the 
     /// V5 Brain
     PIT,
-    /// Used when wirelessly downloading to the
-    /// V5 Brain
-    DOWNLOAD
+    /// Used when wirelessly uploading data to the V5
+    /// Brain
+    UPLOAD,
+    /// Used when wirelessly downloading data from the V5
+    /// Brain
+    DOWNLOAD,
 }
