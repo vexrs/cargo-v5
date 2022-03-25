@@ -33,15 +33,15 @@ fn main() -> Result<()>{
     let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&data);
     println!("test crc32: {:x}", crc32);
 
-    device.switch_channel(Some(V5ControllerChannel::DOWNLOAD))?;
+    //device.switch_channel(Some(V5ControllerChannel::DOWNLOAD))?;
     
     // Open a test file
     let mut file = device.open(file_name.to_string(), Some(VexInitialFileMetadata {
-        function: VexFileMode::Download(VexFileTarget::FLASH, true),
+        function: VexFileMode::Download(VexFileTarget::FLASH, false),
         vid: VexVID::USER,
         options: 0,
         length: data.len() as u32,
-        addr: 0x3800000,
+        addr: 0x0,
         crc: crc32,
         r#type: *b"bin\0",
         timestamp: (chrono::Utc::now().timestamp() - chrono::Utc.ymd(2000, 1, 1)
@@ -64,7 +64,7 @@ fn main() -> Result<()>{
     
     file.close()?;
 
-    device.switch_channel(Some(V5ControllerChannel::PIT))?;
+    //device.switch_channel(Some(V5ControllerChannel::PIT))?;
 
     // Get the metadata
     let metadata = device.get_file_metadata(file_name.to_string(), None, None)?;

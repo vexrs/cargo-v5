@@ -73,27 +73,27 @@ impl Default for VexInitialFileMetadata {
 /// File metadata returned from the V5 device
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VexFileMetadata {
-    pub idx: u8,
+    pub linked_vid: u8,
     pub size: u32,
     pub addr: u32,
     pub crc: u32,
     pub r#type: [u8; 4],
     pub timestamp: u32,
     pub version: u32,
-    pub filename: [u8; 24],
+    pub linked_filename: [u8; 24],
 }
 
 impl Default for VexFileMetadata {
     fn default() -> Self {
         VexFileMetadata {
-            idx: 0,
+            linked_vid: 0,
             size: 0,
             addr: 0,
             crc: 0,
-            r#type: *b"\0\0\0\0",
+            r#type: *b"bin\0",
             timestamp: 0,
             version: 0,
-            filename: [0; 24],
+            linked_filename: [0; 24],
         }
     }
 }
