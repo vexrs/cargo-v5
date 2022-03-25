@@ -221,6 +221,8 @@ impl<T> VexProtocolWrapper<T>
 
         // Flush all pending writes on the buffer.
         self.wraps.flush()?;
+
+        
         
         
         // Return the length of the data sent
@@ -271,6 +273,9 @@ impl<T> VexProtocolWrapper<T>
         // Pack the crc into the packet
         packet.push(calc.checked_shr(8).unwrap_or(0) as u8);
         packet.push((calc & 0xff) as u8);
+        payload_proper.push(calc.checked_shr(8).unwrap_or(0) as u8);
+        payload_proper.push((calc & 0xff) as u8);
+        
 
         Ok(packet)
     }

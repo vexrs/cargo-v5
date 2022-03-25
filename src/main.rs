@@ -16,7 +16,7 @@ use anyhow::Result;
 fn main() -> Result<()>{
     let port = serialport::new("/dev/ttyACM0", 115200)
         .parity(serialport::Parity::None)
-        .timeout(std::time::Duration::new(5,0))// We handle our own timeouts so a long timeout on the serial side is required.
+        .timeout(std::time::Duration::new(10,0))// We handle our own timeouts so a long timeout on the serial side is required.
         .stop_bits(serialport::StopBits::One).open()?;
 
     let wrapper = VexProtocolWrapper::new(VexDeviceType::System, port);
@@ -28,43 +28,12 @@ fn main() -> Result<()>{
 
     
 
-    let data = Vec::<u8>::from(*b"Hello, Culpeper Team 7122A!");
+    let data = Vec::<u8>::from(*b"Hello, Culpeper Team 7122A! This is a really long message that I want to keep really super duper long so that I can test how well my system works. This is because it needs to be longer than 512 bytes so I can test overflow. There are two routes in the code for detecting overflow that I have not tested yet so I will make this 'file' super long. This text is always encoded in ascii for some reason. It could be in UTF-8, but I keep it as ascii for two reasons: Compatibility with other software like RMS and PROS, and so that if you are writign a slot_x.ini the information shows up in the UI correctly. I will copy and pase this a second time.");
     // Grab a crc32 of the data
     let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&data);
     println!("test crc32: {:x}", crc32);
 
-    device.switch_channel(Some(V5ControllerChannel::DOWNLOAD))?;
     
-    // Open a test file
-    let mut file = device.open(file_name.to_string(), Some(VexInitialFileMetadata {
-        function: VexFileMode::Download(VexFileTarget::FLASH, false),
-        vid: VexVID::USER,
-        options: 0,
-        length: data.len() as u32,
-        addr: 0x0,
-        crc: crc32,
-        r#type: *b"bin\0",
-        timestamp: (chrono::Utc::now().timestamp() - chrono::Utc.ymd(2000, 1, 1)
-        .and_hms(0, 0, 0).timestamp()).try_into().unwrap(),
-        version: 0x01000000
-    }))?;
-
-    
-
-    
-    let buf = file.read_all_vec()?;
-    println!("{:?}", buf);
-
-    // Convert buf to string
-    let s = ascii::AsciiStr::from_ascii(&buf)?.to_string();
-    println!("{}",s); 
-    
-
-    //file.write_position(0x3800000, data)?;
-    
-    file.close()?;
-
-    device.switch_channel(Some(V5ControllerChannel::PIT))?;
 
     // Get the metadata
     let metadata = device.get_file_metadata(file_name.to_string(), None, None)?;
