@@ -46,18 +46,7 @@ fn main() -> Result<()>{
         })
     )?;
 
-    let mut buf = Vec::<u8>::new();
-
-    for i in (0..metadata.size).step_by(512) {
-        let mut packet_size: u16 = 512;
-
-        if i + <u32>::from(packet_size) > metadata.size {
-            packet_size = <u16>::try_from(metadata.size - i)?;
-        }
-
-        let data = file.read_len(i+metadata.addr, packet_size)?;
-        buf.extend(data);
-    }
+    let buf = file.read_all()?;
 
     println!("{:?}", buf);
     println!("{}", buf.len());

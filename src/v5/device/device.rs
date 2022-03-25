@@ -70,6 +70,30 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
 
         Ok(data)
     }
+
+    /// Reads the entire file
+    pub fn read_all(&self) -> Result<Vec<u8>> {
+        // Create the buffer to store data in
+        let mut data = Vec::<u8>::new();
+
+        let max_size: u16 = 512;
+        let length = self.transfer_metadata.file_size;
+
+        // Iterate over the file's size in steps of max_packet_size
+        for i in (0..length).step_by(max_size.into()) {
+            
+            // Find the packet size that we want to read in
+            let packet_size = if i + <u32>::from(max_size) > length {
+                <u16>::try_from(length - i)?
+            } else {
+                max_size
+            };
+            
+            // Read the data and append it to the buffer
+            data.extend(self.read_len(i+self.metadata.addr, packet_size)?);
+        }
+        Ok(data)
+    }
 }
 
 
