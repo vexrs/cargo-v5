@@ -181,6 +181,9 @@ impl<T: Write + Read> VexV5Device<T> {
         // Send the command
         self.wraps.borrow_mut().send_extended(VexDeviceCommand::SwitchChannel, Vec::<u8>::from([channel as u8]))?;
 
+        // Recieve and discard the response
+        let _response = self.wraps.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
+
         Ok(())
     }
 
