@@ -271,7 +271,6 @@ impl<T> VexProtocolWrapper<T>
         // Pack the crc into the packet
         packet.push(calc.checked_shr(8).unwrap_or(0) as u8);
         packet.push((calc & 0xff) as u8);
-        
 
         Ok(packet)
     }

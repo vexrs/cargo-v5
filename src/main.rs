@@ -1,6 +1,7 @@
 use std::io::Read;
 
-use vex_v5_serial::v5::protocol::VexFiletransferFinished;
+use vex_v5_serial::v5::protocol::vex::ResponseCheckFlags;
+use vex_v5_serial::v5::protocol::{VexFiletransferFinished, VEX_CRC32};
 use vex_v5_serial::v5::protocol::{
     VexDeviceCommand,
     VexDeviceType,
@@ -23,21 +24,33 @@ fn main() -> Result<()>{
     let ver = device.get_device_version()?;
     println!("{:?}", ver);
 
+    let file_name = "test.txt";
+
+    
+
+    let data = Vec::<u8>::from(*b"Hello, Culpeper Team!");
+
+    // Grab a crc32 of the data
+    let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&data);
+    println!("test crc32: {:x}", crc32);
+
     // Open a test file
-    let mut file = device.open("test.txt".to_string(), Some(VexInitialFileMetadata {
+    let mut file = device.open(file_name.to_string(), Some(VexInitialFileMetadata {
         function: VexFileMode::Download(VexFileTarget::FLASH, false),
         vid: VexVID::USER,
         options: 0,
-        length: 0,
-        addr: 0,
-        crc: 0,
+        length: data.len() as u32,
+        addr: 0x0,
+        crc: crc32,
         r#type: *b"bin\0",
-        timestamp: 0,
+        timestamp: <u32>::try_from(std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH)?.as_secs())?,
         version: 0x01000000
     }))?;
 
-    let mut buf = [0u8;13];
-    file.read(&mut buf)?;
+    
+
+     
+    let buf = file.read_range(0, 25)?;
     println!("{:?}", buf);
 
     // Convert buf to string
@@ -45,17 +58,14 @@ fn main() -> Result<()>{
     println!("{}",s);
     
 
+    //file.write_position(0x3800000, data)?;
+    
     file.close()?;
 
     // Get the metadata
-    let metadata = device.get_file_metadata("test.txt".to_string(), None, None);
-    println!("{:?}", metadata);
+    //let metadata = device.get_file_metadata(file_name.to_string(), None, None)?;
+    //println!("{:?}", metadata);
 
-    //let to_serialize: (u8, u8, [u8; 24]) = (1, 0, *b"slot_1.bin\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
-    //let data = bincode::serialize(&to_serialize)?;
-    //wrapper.send_extended(VexDeviceCommand::ExecuteFile, data)?;
-    //let data = wrapper.receive_extended(Some(std::time::Duration::new(5,0)))?;
-    
 
     drop(device);
     Ok(())

@@ -7,7 +7,7 @@ use anyhow::{Result, anyhow};
 
 /// The target to open the file on
 #[repr(u8)]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum VexFileTarget {
     DDR = 0,
     FLASH = 1,
@@ -16,7 +16,7 @@ pub enum VexFileTarget {
 
 /// The mode to open a file on the V5 device with
 #[repr(u8)]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum VexFileMode {
     /// Open the file for uploading
     Upload(VexFileTarget, bool),
@@ -27,7 +27,7 @@ pub enum VexFileMode {
 
 /// Different possible vex VIDs
 #[repr(u8)]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum VexVID { // I also have no idea what this is.
     USER = 1,
     SYSTEM = 15,
@@ -39,7 +39,7 @@ pub enum VexVID { // I also have no idea what this is.
 
 /// Represents vex file metadata when initiating
 /// a transfer
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VexInitialFileMetadata {
     pub function: VexFileMode,
     pub vid: VexVID,
@@ -71,7 +71,7 @@ impl Default for VexInitialFileMetadata {
 }
 
 /// File metadata returned from the V5 device
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VexFileMetadata {
     pub idx: u8,
     pub size: u32,
@@ -101,9 +101,9 @@ impl Default for VexFileMetadata {
 /// Metadata for a file transfer
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VexFiletransferMetadata {
-    max_packet_size: u16,
-    file_size: u32,
-    crc: u32,
+    pub max_packet_size: u16,
+    pub file_size: u32,
+    pub crc: u32,
 }
 
 bitflags!{
@@ -152,8 +152,8 @@ impl TryFrom<(u8, u8)> for VexProduct {
 /// This struct represents the version of a vex v5 device
 #[derive(Debug, Clone, Copy)]
 pub struct V5DeviceVersion {
-    system_version: (u8, u8, u8, u8, u8),
-    product_type: VexProduct,
+    pub system_version: (u8, u8, u8, u8, u8),
+    pub product_type: VexProduct,
 }
 
 
