@@ -47,8 +47,25 @@ pub enum VexACKType {
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, FromPrimitive, ToPrimitive)]
 pub enum VexDeviceCommand {
+    OpenFile = 0x11,
+    ExitFile = 0x12,
     ExecuteFile = 0x18,
     Extended = 0x56,
     GetSystemVersion = 0xA4,
+}
+
+
+/// Represents a flag that tells the brain what to do
+/// after a file transfer is complete
+pub enum VexFiletransferFinished {
+    DoNothing = 0b0,
+    RunProgram = 0b1,
+    ShowRunScreen = 0b11,
+}
+
+impl Default for VexFiletransferFinished {
+    fn default() -> Self {
+        VexFiletransferFinished::DoNothing
+    }
 }
 

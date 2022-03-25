@@ -1,22 +1,53 @@
 use crate::v5::protocol::{
     VexProtocolWrapper,
-    VexDeviceCommand
+    VexDeviceCommand, VexFiletransferFinished
 };
-
 use crate::v5::device::{
     V5DeviceVersion, VexProduct,
-    V5BrainFlags, V5ControllerFlags
+    V5ControllerFlags, VexFileMode,
+    VexFileTarget, VexFileMetadata,
+    VexFiletransferMetadata
 };
-
 use std::io::{Read, Write};
+use std::rc::Rc;
+use std::cell::RefCell;
+use anyhow::{Result};
+use ascii::AsAsciiStr;
 
-use anyhow::{Result,anyhow};
+
+
+/// This represents a file handle
+/// for files on the V5 device.
+#[derive(Clone, Debug)]
+pub struct V5FileHandle<T> 
+    where T: Read + Write {
+    device: Rc<RefCell<VexProtocolWrapper<T>>>,
+    transfer_metadata: VexFiletransferMetadata,
+    metadata: VexFileMetadata,
+    position: usize
+}
+
+impl<T: Write + Read> V5FileHandle<T> {
+    pub fn close(&mut self) -> Result<Vec<u8>> {
+
+
+        // Send the exit command
+        self.device.borrow_mut().send_extended(VexDeviceCommand::ExitFile, Vec::<u8>::from([0b11u8]))?;
+
+        // Get the response
+        let response = self.device.borrow_mut().receive_extended(None)?;
+        
+        // Return the response data
+        Ok(response.1)
+    }
+}
+
 
 /// This struct wraps a vex protocol wrapper
 /// to provide high-level access to the VEX device.
 #[derive(Clone, Debug)]
 pub struct VexV5Device<T: Write + Read> {
-    wraps: VexProtocolWrapper<T>
+    wraps: Rc<RefCell<VexProtocolWrapper<T>>>
 }
 
 /// This trait contains functions that all vex v5 devices have
@@ -26,7 +57,7 @@ impl<T: Write + Read> VexV5Device<T> {
     /// Initializes a new device
     pub fn new(wraps: VexProtocolWrapper<T>) -> VexV5Device<T> {
         VexV5Device {
-            wraps
+            wraps: Rc::new(RefCell::new(wraps))
         }
     }
 
@@ -35,8 +66,8 @@ impl<T: Write + Read> VexV5Device<T> {
         
 
         // Request system information
-        self.wraps.send_simple(VexDeviceCommand::GetSystemVersion, Vec::new())?;
-        let data = self.wraps.receive_simple(None)?;
+        self.wraps.borrow_mut().send_simple(VexDeviceCommand::GetSystemVersion, Vec::new())?;
+        let data = self.wraps.borrow_mut().receive_simple(None)?;
         
         // Seperate out the version data
         let vs = data.1;
@@ -51,9 +82,81 @@ impl<T: Write + Read> VexV5Device<T> {
         Ok(ver)
     }
 
+    /// Opens a file handle on the v5 device
+    pub fn open(&mut self, file_name: String, file_metadata: Option<VexFileMetadata>) -> Result<V5FileHandle<T>> {
 
+        // Convert the file name to a zero-terminated string 24 bytes long
+        let mut file_name_bytes = [0u8; 24];
+        let file_name = file_name.as_ascii_str()?;
+        for (i, b) in file_name.as_slice().iter().enumerate() {
+            if (i + 1) > 23 {
+                break;
+            }
+            file_name_bytes[i] = *b as u8;
+        }
+        file_name_bytes[23] = 0;
 
-    /// Checks if we are connected to the brain wirelessly.
+        // Resolve file metadata to defaults
+        let file_metadata = file_metadata.unwrap_or(VexFileMetadata::default());
+        let metadata = file_metadata.clone();
+        
+
+        // Get a tuple of the function and target
+        let ft: (u8, u8, bool) = match file_metadata.function {
+            VexFileMode::Upload(target, overwrite) => {
+                (1, match target {
+                    VexFileTarget::DDR => 0,
+                    VexFileTarget::FLASH => 1,
+                    VexFileTarget::SCREEN => 2,
+                }, overwrite)
+            },
+            VexFileMode::Download(target, overwrite) => {
+                (2, match target {
+                    VexFileTarget::DDR => 0,
+                    VexFileTarget::FLASH => 1,
+                    VexFileTarget::SCREEN => 2,
+                }, overwrite)
+            }
+        };
+
+        // The payload to pack
+        let payload: (u8, u8, u8, u8, u32, u32, u32,
+                [u8; 4], u32, u32, [u8; 24]) = (
+                    ft.0,
+                    ft.1,
+                    file_metadata.vid as u8,
+                    ft.2 as u8 | file_metadata.options,
+                    file_metadata.length,
+                    file_metadata.addr,
+                    file_metadata.crc,
+                    file_metadata.r#type,
+                    file_metadata.timestamp,
+                    file_metadata.version,
+                    file_name_bytes,
+                );
+        
+        // Pack the payload
+        let data = bincode::serialize(&payload)?;
+
+        // Make the request
+        self.wraps.borrow_mut().send_extended(VexDeviceCommand::OpenFile, data)?;
+        
+        let recv = self.wraps.borrow_mut().receive_extended(None)?;
+        
+        // Unpack the payload
+        let recv: VexFiletransferMetadata = bincode::deserialize(&recv.1)?;
+        
+
+        // Create the file handle
+        Ok(V5FileHandle {
+            device: Rc::clone(&self.wraps),
+            transfer_metadata: recv,
+            metadata,
+            position: 0
+        })
+    }
+
+    /// Checks if the device is a controller connected to the brain wirelessly.
     pub fn is_wireless(&mut self) -> Result<bool> {
         // Get device version info
         let info = self.get_device_version()?;

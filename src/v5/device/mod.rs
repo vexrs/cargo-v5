@@ -1,9 +1,83 @@
 mod device;
+use chrono::TimeZone;
 pub use device::VexV5Device;
 use bitflags::bitflags;
-use anyhow::{Result,anyhow};
+use serde::{Serialize, Deserialize};
+use anyhow::{Result, anyhow};
+
+/// The target to open the file on
+#[repr(u8)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum VexFileTarget {
+    DDR = 0,
+    FLASH = 1,
+    SCREEN = 2,
+}
+
+/// The mode to open a file on the V5 device with
+#[repr(u8)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum VexFileMode {
+    /// Open the file for uploading
+    Upload(VexFileTarget, bool),
+    /// Open the file for downloading
+    Download(VexFileTarget, bool),
+}
 
 
+/// Different possible vex VIDs
+#[repr(u8)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum VexVID { // I also have no idea what this is.
+    USER = 1,
+    SYSTEM = 15,
+    RMS = 16, // I believe that robotmesh studio uses this
+    PROS = 24, // PROS uses this one
+    MW = 32, // IDK what this one is.
+}
+
+
+/// Represents vex file metadata when initiating
+/// a transfer
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VexFileMetadata {
+    pub function: VexFileMode,
+    pub vid: VexVID,
+    pub options: u8,
+    pub length: u32,
+    pub addr: u32,
+    pub crc: u32,
+    pub r#type: [u8; 4],
+    pub timestamp: u32,
+    pub version: u32,
+}
+
+impl Default for VexFileMetadata {
+    fn default() -> Self {
+        VexFileMetadata {
+            function: VexFileMode::Upload(VexFileTarget::FLASH, true),
+            vid: VexVID::USER,
+            options: 0,
+            length: 0,
+            addr: 0x3800000,
+            crc: 0,
+            r#type: *b"bin\0",
+            // Default timestamp to number of seconds after Jan 1 2000
+            timestamp: (chrono::Utc::now().timestamp() - chrono::Utc.ymd(2000, 1, 1)
+                            .and_hms(0, 0, 0).timestamp()).try_into().unwrap(),
+            version: 0,
+        }
+    }
+}
+
+
+/// Metadata for a file transfer
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VexFiletransferMetadata {
+    max_packet_size: u16,
+    file_size: u32,
+    crc: u32,
+}
 
 bitflags!{
     /// Configuration flags for the v5 brain
@@ -53,4 +127,16 @@ impl TryFrom<(u8, u8)> for VexProduct {
 pub struct V5DeviceVersion {
     system_version: (u8, u8, u8, u8, u8),
     product_type: VexProduct,
+}
+
+
+/// Enum that represents the channel
+/// for the V5 Controller
+pub enum V5ControllerChannel {
+    /// Used when wirelessly controlling the 
+    /// V5 Brain
+    PIT,
+    /// Used when wirelessly downloading to the
+    /// V5 Brain
+    DOWNLOAD
 }
