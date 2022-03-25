@@ -40,7 +40,7 @@ pub enum VexVID { // I also have no idea what this is.
 /// Represents vex file metadata when initiating
 /// a transfer
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct VexFileMetadata {
+pub struct VexInitialFileMetadata {
     pub function: VexFileMode,
     pub vid: VexVID,
     pub options: u8,
@@ -52,9 +52,9 @@ pub struct VexFileMetadata {
     pub version: u32,
 }
 
-impl Default for VexFileMetadata {
+impl Default for VexInitialFileMetadata {
     fn default() -> Self {
-        VexFileMetadata {
+        VexInitialFileMetadata {
             function: VexFileMode::Upload(VexFileTarget::FLASH, true),
             vid: VexVID::USER,
             options: 0,
@@ -70,6 +70,33 @@ impl Default for VexFileMetadata {
     }
 }
 
+/// File metadata returned from the V5 device
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VexFileMetadata {
+    pub idx: u8,
+    pub size: u32,
+    pub addr: u32,
+    pub crc: u32,
+    pub r#type: [u8; 4],
+    pub timestamp: u32,
+    pub version: u32,
+    pub filename: [u8; 24],
+}
+
+impl Default for VexFileMetadata {
+    fn default() -> Self {
+        VexFileMetadata {
+            idx: 0,
+            size: 0,
+            addr: 0,
+            crc: 0,
+            r#type: *b"\0\0\0\0",
+            timestamp: 0,
+            version: 0,
+            filename: [0; 24],
+        }
+    }
+}
 
 /// Metadata for a file transfer
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

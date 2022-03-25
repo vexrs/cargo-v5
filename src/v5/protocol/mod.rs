@@ -5,15 +5,11 @@ pub use vex::VexProtocolWrapper;
 use crc::Algorithm;
 
 /// Vex uses CRC16/XMODEM as the CRC16.
-const VEX_CRC16: Algorithm<u16> = Algorithm {
-    poly: 0x1021,
-    init: 0x0000,
-    refin: false,
-    refout: false,
-    xorout: 0x0000,
-    check: 0x31c3,
-    residue: 0x0000,
-};
+pub const VEX_CRC16: Algorithm<u16> = crc::CRC_16_XMODEM;
+
+/// Reverse engineering suggests that vex uses CRC-32/CKSUM
+/// as their CRC32.
+pub const VEX_CRC32: Algorithm<u32> = crc::CRC_32_CKSUM;
 
 /// Represents the type of a vex device
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +47,7 @@ pub enum VexDeviceCommand {
     ExitFile = 0x12,
     ReadFile = 0x14,
     ExecuteFile = 0x18,
+    GetMetadataByFilename = 0x19,
     Extended = 0x56,
     GetSystemVersion = 0xA4,
 }

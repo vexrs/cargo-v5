@@ -6,7 +6,7 @@ use vex_v5_serial::v5::protocol::{
     VexDeviceType,
     vex::VexProtocolWrapper
 };
-use vex_v5_serial::v5::device::{VexV5Device, VexFileMetadata, VexFileMode, VexFileTarget,
+use vex_v5_serial::v5::device::{VexV5Device, VexInitialFileMetadata, VexFileMode, VexFileTarget,
     VexVID};
 use anyhow::Result;
 
@@ -24,7 +24,7 @@ fn main() -> Result<()>{
     println!("{:?}", ver);
 
     // Open a test file
-    let mut file = device.open("test.txt".to_string(), Some(VexFileMetadata {
+    let mut file = device.open("test.txt".to_string(), Some(VexInitialFileMetadata {
         function: VexFileMode::Download(VexFileTarget::FLASH, false),
         vid: VexVID::USER,
         options: 0,
@@ -36,15 +36,20 @@ fn main() -> Result<()>{
         version: 0x01000000
     }))?;
 
-    let mut buf = [0u8;16];
+    let mut buf = [0u8;13];
     file.read(&mut buf)?;
     println!("{:?}", buf);
 
     // Convert buf to string
     let s = ascii::AsciiStr::from_ascii(&buf)?.to_string();
     println!("{}",s);
+    
 
     file.close()?;
+
+    // Get the metadata
+    let metadata = device.get_file_metadata("test.txt".to_string(), None, None);
+    println!("{:?}", metadata);
 
     //let to_serialize: (u8, u8, [u8; 24]) = (1, 0, *b"slot_1.bin\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
     //let data = bincode::serialize(&to_serialize)?;

@@ -58,6 +58,12 @@ impl<T> VexProtocolWrapper<T>
         }
     }
 
+    /// Flushes the write buffer
+    pub fn flush(&mut self) -> Result<()> {
+        self.wraps.flush()?;
+        Ok(())
+    }
+
     /// Receives an extended packet from the vex device
     pub fn receive_extended(&mut self, timeout: Option<Duration>, should_check: ResponseCheckFlags) -> Result<(VexDeviceCommand, Vec<u8>, Vec<u8>)> {
         

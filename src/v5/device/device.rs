@@ -1,19 +1,21 @@
 use crate::v5::protocol::vex::ResponseCheckFlags;
 use crate::v5::protocol::{
     VexProtocolWrapper,
-    VexDeviceCommand, VexFiletransferFinished
+    VexDeviceCommand, VEX_CRC32
 };
 use crate::v5::device::{
     V5DeviceVersion, VexProduct,
     V5ControllerFlags, VexFileMode,
-    VexFileTarget, VexFileMetadata,
+    VexFileTarget, VexInitialFileMetadata,
     VexFiletransferMetadata
 };
 use std::io::{Read, Write};
 use std::rc::Rc;
 use std::cell::RefCell;
 use anyhow::{Result};
-use ascii::AsAsciiStr;
+use ascii::{AsAsciiStr};
+
+use super::{VexVID, VexFileMetadata};
 
 
 
@@ -24,7 +26,8 @@ pub struct V5FileHandle<T>
     where T: Read + Write {
     device: Rc<RefCell<VexProtocolWrapper<T>>>,
     transfer_metadata: VexFiletransferMetadata,
-    metadata: VexFileMetadata,
+    metadata: VexInitialFileMetadata,
+    file_name: AsciiString,
     position: usize
 }
 
@@ -52,7 +55,7 @@ impl<T: Write + Read> std::io::Read for V5FileHandle<T> {
             // Determine the current packet size
             let packet_size = self.transfer_metadata.max_packet_size;
 
-            let packet_size = if i + packet_size as usize > buf.len() {
+            let packet_size = if i + <usize>::from(packet_size) > buf.len() {
                 (buf.len() - i).try_into().unwrap_or(0xFFFF)
             } else {
                 packet_size
@@ -61,10 +64,10 @@ impl<T: Write + Read> std::io::Read for V5FileHandle<T> {
             // Pad the number of bytes to the nearest multiple of 4
             // This is needed due to the behavior of the v5 requiring this,
             // not because of any special operation.
-            let padded_size = (packet_size + 3) & !(0x3u16);
+            let padded_size = (packet_size + 3) & (!0x3u16);
 
             // Pack the payload for the command together
-            let payload: (u32, u16) = (<u32>::try_from(i).unwrap() + <u32>::try_from(self.position).unwrap() , padded_size);
+            let payload: (u32, u16) = (<u32>::try_from(i + self.position).unwrap(), padded_size);
             let payload = bincode::serialize(&payload).unwrap();
 
             // Send the command
@@ -76,10 +79,10 @@ impl<T: Write + Read> std::io::Read for V5FileHandle<T> {
             
             // Unpack the response
             //let recv_len: (u32) = bincode::deserialize(&recv.1[0..4]).unwrap();
-
+            
             // Truncate the data to the requested length
-            let recv_data = recv.1[0..packet_size as usize].to_vec();
-
+            let recv_data = recv.1[3..3+packet_size as usize].to_vec();
+            
             // Copy the data to the buffer
             buf[i..i + <usize>::from(packet_size)].copy_from_slice(&recv_data);
 
@@ -91,6 +94,35 @@ impl<T: Write + Read> std::io::Read for V5FileHandle<T> {
         Ok(buf.len())
     }
 }
+
+impl<T: Write + Read> std::io::Write for V5FileHandle<T> {
+    fn flush(&mut self) -> Result<(), std::io::Error>{
+        self.device.borrow_mut().flush().unwrap();
+        Ok(())
+    }
+
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error>{
+
+        // Create a new mutable vector for the contents of buf
+        let mut buf_vec = buf.to_vec();
+
+        // Pad it out to a length that is a multiple of four
+        let padded_size = (buf_vec.len() + 3) & (!0x3usize);
+        buf_vec.resize(padded_size, 0);
+
+        // Take the CRC32 of the buffer
+        let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(buf);
+
+        // Get the buffer size
+        let file_len = buf.len();
+
+        // Setup a linked file name
+        
+
+        Ok(0)
+    }
+}
+
 
 
 /// This struct wraps a vex protocol wrapper
@@ -132,8 +164,40 @@ impl<T: Write + Read> VexV5Device<T> {
         Ok(ver)
     }
 
+    /// Get metadata for a file from it's name
+    pub fn get_file_metadata(&self, file_name: String, vid: Option<VexVID>, options: Option<u8>) -> Result<VexFileMetadata> {
+        
+        // Resolve default values
+        let vid = vid.unwrap_or(VexVID::USER);
+        let options = options.unwrap_or(0);
+
+        // Convert the file name into a static length ascii string of length 24
+        let mut file_name_bytes = [0u8; 24];
+        let file_name = file_name.as_ascii_str()?;
+        for (i, b) in file_name.as_slice().iter().enumerate() {
+            if (i + 1) > 23 {
+                break;
+            }
+            file_name_bytes[i] = *b as u8;
+        }
+        file_name_bytes[23] = 0;
+
+        // Pack the data together
+        let data = bincode::serialize(&(vid as u8, options, file_name_bytes)).unwrap();
+
+        // Send the request
+        self.wraps.borrow_mut().send_extended(VexDeviceCommand::GetMetadataByFilename, data)?;
+        let recv = self.wraps.borrow_mut().receive_extended(None, ResponseCheckFlags::ALL)?;
+
+        // Parse the response
+        let recv: VexFileMetadata = bincode::deserialize(&recv.1)?;
+
+
+        Ok(recv)
+    }
+
     /// Opens a file handle on the v5 device
-    pub fn open(&mut self, file_name: String, file_metadata: Option<VexFileMetadata>) -> Result<V5FileHandle<T>> {
+    pub fn open(&mut self, file_name: String, file_metadata: Option<VexInitialFileMetadata>) -> Result<V5FileHandle<T>> {
 
         // Convert the file name to a zero-terminated string 24 bytes long
         let mut file_name_bytes = [0u8; 24];
@@ -147,7 +211,7 @@ impl<T: Write + Read> VexV5Device<T> {
         file_name_bytes[23] = 0;
 
         // Resolve file metadata to defaults
-        let file_metadata = file_metadata.unwrap_or(VexFileMetadata::default());
+        let file_metadata = file_metadata.unwrap_or(VexInitialFileMetadata::default());
         let metadata = file_metadata.clone();
         
 
@@ -202,6 +266,7 @@ impl<T: Write + Read> VexV5Device<T> {
             device: Rc::clone(&self.wraps),
             transfer_metadata: recv,
             metadata,
+            file_name,
             position: 0
         })
     }
