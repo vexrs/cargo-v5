@@ -10,7 +10,7 @@ use vex_v5_serial::v5::protocol::{
 use vex_v5_serial::v5::device::{VexV5Device, VexInitialFileMetadata, VexFileMode, VexFileTarget,
     VexVID, V5ControllerChannel};
 use anyhow::Result;
-
+use ascii::AsAsciiStr;
 
 
 fn main() -> Result<()>{
@@ -26,19 +26,49 @@ fn main() -> Result<()>{
 
     let file_name = "test.txt";
 
-    
-
-    let data = Vec::<u8>::from(*b"Hello, Culpeper Team 7122A! This is a really long message that I want to keep really super duper long so that I can test how well my system works. This is because it needs to be longer than 512 bytes so I can test overflow. There are two routes in the code for detecting overflow that I have not tested yet so I will make this 'file' super long. This text is always encoded in ascii for some reason. It could be in UTF-8, but I keep it as ascii for two reasons: Compatibility with other software like RMS and PROS, and so that if you are writign a slot_x.ini the information shows up in the UI correctly. I will copy and pase this a second time.");
-    // Grab a crc32 of the data
-    let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&data);
-    println!("test crc32: {:x}", crc32);
-
-    
-
-    // Get the metadata
+    // Get file metadata
     let metadata = device.get_file_metadata(file_name.to_string(), None, None)?;
     println!("{:?}", metadata);
 
+    // Open a file
+    let mut file = device.open(
+        file_name.to_string(),
+        Some(VexInitialFileMetadata {
+            function: VexFileMode::Download(VexFileTarget::FLASH, false),
+            vid: VexVID::USER,
+            options: 0,
+            length: 0,
+            addr: 0x3800000,
+            crc: 0,
+            r#type: *b"txt\0",
+            timestamp: 0x0,
+            version: 0x0,
+        })
+    )?;
+
+    let mut buf = Vec::<u8>::new();
+
+    for i in (0..metadata.size).step_by(512) {
+        let mut packet_size: u16 = 512;
+
+        if i + <u32>::from(packet_size) > metadata.size {
+            packet_size = <u16>::try_from(metadata.size - i)?;
+        }
+
+        let data = file.read_len(i+metadata.addr, packet_size)?;
+        buf.extend(data);
+    }
+
+    println!("{:?}", buf);
+    println!("{}", buf.len());
+
+    // Convert buf to ascii string and then print
+    let ascii_str = buf.as_ascii_str()?;
+    println!("{}", ascii_str);
+    println!("{}", ascii_str.len());
+
+    // Close the file
+    file.close()?;
 
     drop(device);
     Ok(())

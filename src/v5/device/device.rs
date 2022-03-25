@@ -47,6 +47,29 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         Ok(response.1)
     }
 
+
+    /// Reads n bytes from the file
+    pub fn read_len(&self, offset: u32, n_bytes: u16) -> Result<Vec<u8>> {
+
+        // Pad out the number of bytes to be a multiple of four
+        let n_bytes_pad = (n_bytes + 3) & !3;
+
+        // Create a payload containing the offset
+        // and the number of bytes to read
+        let payload = bincode::serialize(&(offset, n_bytes_pad))?;
+
+        // Send the read command
+        self.device.borrow_mut().send_extended(VexDeviceCommand::ReadFile, payload)?;
+
+        // Recieve the response
+        let response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::CRC)?;
+
+        // Truncate to requested data (Ignore the integer sent in the first four bytes)
+        let offset = 4;
+        let data = response.1[offset..offset + n_bytes as usize].to_vec();
+
+        Ok(data)
+    }
 }
 
 
@@ -154,8 +177,87 @@ impl<T: Write + Read> VexV5Device<T> {
     /// Opens a file handle on the v5 device
     pub fn open(&mut self, file_name: String, file_metadata: Option<VexInitialFileMetadata>) -> Result<V5FileHandle<T>> {
 
-        
+        /// Convert the name to ascii
+        let file_name = file_name.as_ascii_str()?;
+        let mut file_name_bytes: [u8; 24] = [0; 24];
+        for (i, b) in file_name.as_slice().iter().enumerate() {
+            if (i + 1) > 23 {
+                break;
+            }
+            file_name_bytes[i] = *b as u8;
+        }
+        file_name_bytes[23] = 0;
 
+        // Resolve the file metadata to it's default value
+        let file_metadata = file_metadata.unwrap_or(VexInitialFileMetadata::default());
+
+        // Get a tuple from the file function
+        let ft: (u8, u8, u8) = match file_metadata.function {
+            VexFileMode::Upload(t, o) => {
+                (1, match t {
+                    VexFileTarget::DDR => 0,
+                    VexFileTarget::FLASH => 1,
+                    VexFileTarget::SCREEN => 2,
+                }, o as u8)
+            },
+            VexFileMode::Download(t, o) => {
+                (2, match t {
+                    VexFileTarget::DDR => 0,
+                    VexFileTarget::FLASH => 1,
+                    VexFileTarget::SCREEN => 2,
+                }, o as u8)
+            }
+        };
+
+        // Pack the payload together
+        let payload: (
+            u8, u8, u8, u8,
+            u32, u32, u32,
+            [u8; 4],
+            u32, u32,
+            [u8; 24],
+        ) = (
+            ft.0,
+            ft.1,
+            file_metadata.vid as u8,
+            ft.2 | file_metadata.options,
+            file_metadata.length,
+            file_metadata.addr,
+            file_metadata.crc,
+            file_metadata.r#type,
+            file_metadata.timestamp,
+            file_metadata.version,
+            file_name_bytes,
+        );
+        let payload = bincode::serialize(&payload)?;
+
+        // Send the request
+        self.wraps.borrow_mut().send_extended(VexDeviceCommand::OpenFile, payload)?;
+
+        // Receive the response
+        let response = self.wraps.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
+
+        // Parse the response
+        let response: (u16, u32, u32) = bincode::deserialize(&response.1)?;
+        let response = VexFiletransferMetadata {
+            max_packet_size: response.0,
+            file_size: response.1,
+            crc: response.2,
+        };
+
+        // Create the file handle
+        let handle = V5FileHandle {
+            device: Rc::clone(&self.wraps),
+            transfer_metadata: response,
+            metadata: file_metadata,
+            file_name: file_name.to_ascii_string(),
+            position: 0,
+            wraps: self,
+            timeout: self.timeout,
+        };
+
+        // Return the handle
+        Ok(handle)
     }
 
     /// Checks if the device is a controller connected to the brain wirelessly.
