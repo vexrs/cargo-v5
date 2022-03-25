@@ -1,3 +1,4 @@
+use crate::v5::protocol::vex::ResponseCheckFlags;
 use crate::v5::protocol::{
     VexProtocolWrapper,
     VexDeviceCommand, VexFiletransferFinished
@@ -35,10 +36,59 @@ impl<T: Write + Read> V5FileHandle<T> {
         self.device.borrow_mut().send_extended(VexDeviceCommand::ExitFile, Vec::<u8>::from([0b11u8]))?;
 
         // Get the response
-        let response = self.device.borrow_mut().receive_extended(None)?;
+        let response = self.device.borrow_mut().receive_extended(None, ResponseCheckFlags::ALL)?;
         
         // Return the response data
         Ok(response.1)
+    }
+}
+
+impl<T: Write + Read> std::io::Read for V5FileHandle<T> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        
+        // Iterate over the length to read in units of the max packet size
+        for i in (0..buf.len()).step_by(self.transfer_metadata.max_packet_size.into()) {
+
+            // Determine the current packet size
+            let packet_size = self.transfer_metadata.max_packet_size;
+
+            let packet_size = if i + packet_size as usize > buf.len() {
+                (buf.len() - i).try_into().unwrap_or(0xFFFF)
+            } else {
+                packet_size
+            };
+
+            // Pad the number of bytes to the nearest multiple of 4
+            // This is needed due to the behavior of the v5 requiring this,
+            // not because of any special operation.
+            let padded_size = (packet_size + 3) & !(0x3u16);
+
+            // Pack the payload for the command together
+            let payload: (u32, u16) = (<u32>::try_from(i).unwrap() + <u32>::try_from(self.position).unwrap() , padded_size);
+            let payload = bincode::serialize(&payload).unwrap();
+
+            // Send the command
+            self.device.borrow_mut().send_extended(VexDeviceCommand::ReadFile, payload).unwrap();
+
+            // Get the response
+            let recv = self.device.borrow_mut().receive_extended(None, ResponseCheckFlags::NONE).unwrap();
+            
+            
+            // Unpack the response
+            //let recv_len: (u32) = bincode::deserialize(&recv.1[0..4]).unwrap();
+
+            // Truncate the data to the requested length
+            let recv_data = recv.1[0..packet_size as usize].to_vec();
+
+            // Copy the data to the buffer
+            buf[i..i + <usize>::from(packet_size)].copy_from_slice(&recv_data);
+
+
+        }
+        // Update position
+        self.position += buf.len();
+
+        Ok(buf.len())
     }
 }
 
@@ -141,7 +191,7 @@ impl<T: Write + Read> VexV5Device<T> {
         // Make the request
         self.wraps.borrow_mut().send_extended(VexDeviceCommand::OpenFile, data)?;
         
-        let recv = self.wraps.borrow_mut().receive_extended(None)?;
+        let recv = self.wraps.borrow_mut().receive_extended(None, ResponseCheckFlags::ALL)?;
         
         // Unpack the payload
         let recv: VexFiletransferMetadata = bincode::deserialize(&recv.1)?;

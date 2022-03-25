@@ -49,6 +49,7 @@ pub enum VexACKType {
 pub enum VexDeviceCommand {
     OpenFile = 0x11,
     ExitFile = 0x12,
+    ReadFile = 0x14,
     ExecuteFile = 0x18,
     Extended = 0x56,
     GetSystemVersion = 0xA4,

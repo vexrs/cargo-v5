@@ -7,7 +7,17 @@ use crate::v5::protocol::{
     VexDeviceType,
     VexACKType
 };
+use bitflags::bitflags;
 
+bitflags! {
+    /// What we should check when receiving a response
+    pub struct ResponseCheckFlags: u8 {
+        const NONE = 0;
+        const ACK = 0b00000001;
+        const CRC = 0b00000010;
+        const ALL = 0b00000011;
+    }
+}
 
 
 
@@ -49,16 +59,16 @@ impl<T> VexProtocolWrapper<T>
     }
 
     /// Receives an extended packet from the vex device
-    pub fn receive_extended(&mut self, timeout: Option<Duration>) -> Result<(VexDeviceCommand, Vec<u8>, Vec<u8>)> {
+    pub fn receive_extended(&mut self, timeout: Option<Duration>, should_check: ResponseCheckFlags) -> Result<(VexDeviceCommand, Vec<u8>, Vec<u8>)> {
         
         // Receive simple data
         let data = self.receive_simple(timeout)?;
         
         let crc = crc::Crc::<u16>::new(&VEX_CRC16);
 
-        // Check the crc of the entirety of the recieved data
+        // Check the crc of the entirety of the recieved data if we should
         let chk = crc.checksum(&data.2);
-        if chk != 0 {
+        if chk != 0 && should_check.contains(ResponseCheckFlags::CRC) {
             return Err(anyhow!("CRC failed on response."))
         }
 
@@ -70,19 +80,23 @@ impl<T> VexProtocolWrapper<T>
         // Get the ack result
         let ack = data.1[0];
 
-        // Try to turn the ack into a member of the enum
-        let ack: VexACKType = match num::FromPrimitive::from_u8(ack) {
-            Some(a) => a,
-            None => {
-                return Err(anyhow!("Device did not ack with unknown response {}", ack));
-            }
-        };
+        // If we should check ack
+        if should_check.contains(ResponseCheckFlags::ACK) {
+             // Try to turn the ack into a member of the enum
+            let ack: VexACKType = match num::FromPrimitive::from_u8(ack) {
+                Some(a) => a,
+                None => {
+                    return Err(anyhow!("Device did not ack with unknown response {}", ack));
+                }
+            };
 
-        // If it is not an ACK, and we are not exited by now
-        // than it is a NACK
-        if ack != VexACKType::ACK {
-            return Err(anyhow!("Device NACKED with response {:02x}", ack as u8));
+            // If it is not an ACK, and we are not exited by now
+            // then it is a NACK
+            if ack != VexACKType::ACK {
+                return Err(anyhow!("Device NACKED with response {:02x}", ack as u8));
+            }
         }
+       
         
         // Strip out the payload
         let payload = Vec::from(&data.1[1..]);

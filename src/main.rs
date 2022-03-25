@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use vex_v5_serial::v5::protocol::VexFiletransferFinished;
 use vex_v5_serial::v5::protocol::{
     VexDeviceCommand,
@@ -27,12 +29,20 @@ fn main() -> Result<()>{
         vid: VexVID::USER,
         options: 0,
         length: 0,
-        addr: 0x03800000,
+        addr: 0,
         crc: 0,
         r#type: *b"bin\0",
         timestamp: 0,
         version: 0x01000000
     }))?;
+
+    let mut buf = [0u8;16];
+    file.read(&mut buf)?;
+    println!("{:?}", buf);
+
+    // Convert buf to string
+    let s = ascii::AsciiStr::from_ascii(&buf)?.to_string();
+    println!("{}",s);
 
     file.close()?;
 
