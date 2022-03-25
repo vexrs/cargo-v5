@@ -1,5 +1,5 @@
 use std::io::Read;
-
+use chrono::TimeZone;
 use vex_v5_serial::v5::protocol::vex::ResponseCheckFlags;
 use vex_v5_serial::v5::protocol::{VexFiletransferFinished, VEX_CRC32};
 use vex_v5_serial::v5::protocol::{
@@ -29,30 +29,30 @@ fn main() -> Result<()>{
     
 
     let data = Vec::<u8>::from(*b"Hello, Culpeper Team 7122A!");
-
     // Grab a crc32 of the data
     let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&data);
     println!("test crc32: {:x}", crc32);
 
     device.switch_channel(Some(V5ControllerChannel::DOWNLOAD))?;
-
+    
     // Open a test file
     let mut file = device.open(file_name.to_string(), Some(VexInitialFileMetadata {
-        function: VexFileMode::Download(VexFileTarget::FLASH, false),
+        function: VexFileMode::Download(VexFileTarget::FLASH, true),
         vid: VexVID::USER,
         options: 0,
         length: data.len() as u32,
-        addr: 0x0,
+        addr: 0x3800000,
         crc: crc32,
         r#type: *b"bin\0",
-        timestamp: <u32>::try_from(std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH)?.as_secs())?,
+        timestamp: (chrono::Utc::now().timestamp() - chrono::Utc.ymd(2000, 1, 1)
+        .and_hms(0, 0, 0).timestamp()).try_into().unwrap(),
         version: 0x01000000
     }))?;
 
     
 
     
-    let buf = file.read_range(0x0, 10)?;
+    let buf = file.read_all_vec()?;
     println!("{:?}", buf);
 
     // Convert buf to string

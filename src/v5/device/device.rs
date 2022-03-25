@@ -92,7 +92,6 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         for b in buf {
             payload.push(b);
         }
-        println!("{:?}", payload);
 
         // Send the command
         self.device.borrow_mut().send_extended(VexDeviceCommand::WriteFile, payload)?;
@@ -104,6 +103,39 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         Ok(())
     }
 
+    /// Reads the entire file into a Vec<u8>
+    pub fn read_all_vec(&mut self) -> Result<Vec<u8>> {
+        let mut buf = Vec::<u8>::new();
+
+        // Get the file metadata
+        let metadata = self.wraps.get_file_metadata(self.file_name.to_string(), Some(self.metadata.vid), None)?;
+        println!("{:?}", self.transfer_metadata);
+
+        let length = metadata.size;
+        
+        
+        for i in (0..length).step_by(
+            self.transfer_metadata.max_packet_size.into()) {
+
+            let n_bytes = if i + <u32>::from(self.transfer_metadata.max_packet_size) > length  {
+                length - i
+            } else {
+                self.transfer_metadata.max_packet_size.into()
+            };
+            println!("{}", n_bytes);
+
+            // Read in from the file
+
+            let data = self.read_range(i, n_bytes.try_into().unwrap())?;
+
+            println!("{:?}", data);
+            
+
+            buf.extend(data);
+        }
+
+        Ok(buf)
+    }
 }
 
 
@@ -262,9 +294,7 @@ impl<T: Write + Read> VexV5Device<T> {
         
         // Pack the payload
         let data = bincode::serialize(&payload)?;
-
-        println!("{:?}", data);
-
+        
 
         // Make the request
         self.wraps.borrow_mut().send_extended(VexDeviceCommand::OpenFile, data)?;
@@ -272,7 +302,12 @@ impl<T: Write + Read> VexV5Device<T> {
         let recv = self.wraps.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
         
         // Unpack the payload
-        let recv: VexFiletransferMetadata = bincode::deserialize(&recv.1)?;
+        let recv: (u16, u32, u32) = bincode::deserialize(&recv.1)?;
+        let recv = VexFiletransferMetadata {
+            max_packet_size: recv.0,
+            file_size: recv.1,
+            crc: recv.2,
+        };
         
         // If we are opening a file for upload, then setup the linked file name
         if let VexFileMode::Upload(_,_) = file_metadata.function {
