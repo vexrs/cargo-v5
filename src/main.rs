@@ -26,36 +26,33 @@ fn main() -> Result<()>{
 
     let file_name = "test.txt";
 
-    // Get file metadata
-    let metadata = device.get_file_metadata(file_name.to_string(), None, None)?;
-    println!("{:?}", metadata);
+    
+
+    let file_contents = b"Hello, World!".to_vec();
+
+    // Calculate the crc32
+    let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&file_contents);
+
+    println!("{:x}", crc32);
 
     // Open a file
     let mut file = device.open(
         file_name.to_string(),
         Some(VexInitialFileMetadata {
-            function: VexFileMode::Download(VexFileTarget::FLASH, false),
+            function: VexFileMode::Upload(VexFileTarget::FLASH, true),
             vid: VexVID::USER,
             options: 0,
-            length: 0,
-            addr: 0x3800000,
-            crc: 0,
-            r#type: *b"txt\0",
-            timestamp: 0x0,
-            version: 0x0,
+            length: file_contents.len() as u32,
+            addr: 0x03800000,
+            crc: crc32,
+            r#type: *b"bin\0",
+            timestamp: <u32>::try_from(std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH)?.as_secs())?,
+            version: 0x01000000,
         })
     )?;
-
-    let buf = file.read_all()?;
-
-    println!("{:?}", buf);
-    println!("{}", buf.len());
-
-    // Convert buf to ascii string and then print
-    let ascii_str = buf.as_ascii_str()?;
-    println!("{}", ascii_str);
-    println!("{}", ascii_str.len());
-
+    
+    file.write_vec(0x03800000, file_contents)?;
+    
     // Close the file
     file.close()?;
 

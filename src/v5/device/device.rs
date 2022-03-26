@@ -94,6 +94,31 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         }
         Ok(data)
     }
+
+    /// Writes a vector of data to the file
+    /// at the specified offset.
+    pub fn write_vec(&self, offset: u32, data: Vec<u8>) -> Result<()> {
+
+        // Pad the payload to have a length that is a multiple of four
+        let data_pad = (data.len() + 3) & !3;
+        let mut data = data.clone();
+        data.resize(data_pad, 0);
+        let data = data;
+
+        // Create the payload
+        let mut payload = bincode::serialize(&offset)?;
+        for b in data {
+            payload.push(b);
+        }
+
+        // Send the write command
+        self.device.borrow_mut().send_extended(VexDeviceCommand::WriteFile, payload)?;
+
+        // Recieve and discard the response
+        let _response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::CRC)?;
+        
+        Ok(())
+    }
 }
 
 
@@ -253,6 +278,7 @@ impl<T: Write + Read> VexV5Device<T> {
             file_metadata.version,
             file_name_bytes,
         );
+        
         let payload = bincode::serialize(&payload)?;
 
         // Send the request
@@ -269,6 +295,22 @@ impl<T: Write + Read> VexV5Device<T> {
             crc: response.2,
         };
 
+        // If this is opening for write, then 
+        // set the linked filename
+        if let VexFileMode::Upload(_, _) = file_metadata.function {
+            // Create the payload
+            let payload: (u8, u8, [u8; 24]) = (
+                file_metadata.vid as u8,
+                file_metadata.options | ft.2,
+                file_name_bytes
+            );
+            let payload = bincode::serialize(&payload)?;
+
+            // Send the command
+            self.wraps.borrow_mut().send_extended(VexDeviceCommand::SetLinkedFilename, payload)?;
+
+        }
+        
         // Create the file handle
         let handle = V5FileHandle {
             device: Rc::clone(&self.wraps),
