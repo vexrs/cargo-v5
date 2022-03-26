@@ -1,7 +1,7 @@
 use crate::v5::protocol::vex::ResponseCheckFlags;
 use crate::v5::protocol::{
     VexProtocolWrapper,
-    VexDeviceCommand
+    VexDeviceCommand, VexFiletransferFinished
 };
 use crate::v5::device::{
     V5DeviceVersion, VexProduct,
@@ -32,11 +32,11 @@ pub struct V5FileHandle<T>
 
 impl<T: Write + Read> V5FileHandle<T> {
     /// Closes the file transfer
-    pub fn close(&mut self) -> Result<Vec<u8>> {
+    pub fn close(&mut self, on_exit: VexFiletransferFinished) -> Result<Vec<u8>> {
 
 
         // Send the exit command
-        self.device.borrow_mut().send_extended(VexDeviceCommand::ExitFile, Vec::<u8>::from([0b00u8]))?;
+        self.device.borrow_mut().send_extended(VexDeviceCommand::ExitFile, bincode::serialize(&(on_exit as u8))?)?;
 
         // Get the response
         let response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;

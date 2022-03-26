@@ -1,12 +1,60 @@
-use vex_v5_serial::v5::protocol::{
-    VEX_CRC32,
-    vex::VexProtocolWrapper,
-};
-use vex_v5_serial::v5::device::{VexV5Device, VexInitialFileMetadata, VexFileMode, VexFileTarget,
-    VexVID, V5ControllerChannel};
+use vex_v5_serial::v5::{discover_v5_ports, protocol::VexProtocolWrapper, device::VexV5Device};
 use anyhow::Result;
+use clap::{Parser, Subcommand};
+
+mod upload;
+
+#[derive(Parser)]
+#[clap(name = "v5")]
+struct V5 {
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Uploads this program to the v5
+    #[clap()]
+    Upload {
+        #[clap(short = 'r', long = "run")]
+        run: bool,
+        slot: Option<u8>,
+    },
+}
+
+
 
 fn main() -> Result<()>{
+    // Just use the first vex port we find.
+    let ports = discover_v5_ports()?;
+    let port = ports[0].clone();
+
+    // Open it
+    let port = serialport::open(&port.port_name, 115200)
+        .parity(serialport::Parity::None)
+        .timeout(std::time::Duration::new(5, 0))
+        .stop_bits(serialport::StopBits::One).open()?;
+    
+
+    // Create a protocol wrapper
+    let wrapper = VexProtocolWrapper::new(port);
+
+    // And create a device to use with it
+    let device = VexV5Device::new(wrapper);
+
+    // Parse the args
+    let args = V5::parse();
+
+    // Match on subcommand
+    match args.command {
+        Commands::Upload { run, slot } => {
+            let slot = slot.unwrap_or(1);
+
+            upload::upload(device, slot, run)
+        }
+    }
+
+    /*
     let port = serialport::new("/dev/ttyACM0", 115200)
         .parity(serialport::Parity::None)
         .timeout(std::time::Duration::new(10,0))// We handle our own timeouts so a long timeout on the serial side is required.
@@ -56,5 +104,6 @@ fn main() -> Result<()>{
     device.switch_channel(Some(V5ControllerChannel::PIT))?;
 
     drop(device);
+    */
     Ok(())
 }
