@@ -1,7 +1,7 @@
 use crate::v5::protocol::vex::ResponseCheckFlags;
 use crate::v5::protocol::{
     VexProtocolWrapper,
-    VexDeviceCommand, VEX_CRC32
+    VexDeviceCommand, VEX_CRC32, VEX_CRC16
 };
 use crate::v5::device::{
     V5DeviceVersion, VexProduct,
@@ -29,7 +29,7 @@ pub struct V5FileHandle<'a, T>
     pub file_name: AsciiString,
     position: usize,
     wraps: &'a VexV5Device<T>,
-    timeout: Option<std::time::Duration>,
+    pub timeout: Option<std::time::Duration>,
 }
 
 impl<'a, T: Write + Read> V5FileHandle<'a, T> {
@@ -38,7 +38,7 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
 
 
         // Send the exit command
-        self.device.borrow_mut().send_extended(VexDeviceCommand::ExitFile, Vec::<u8>::from([0b11u8]))?;
+        self.device.borrow_mut().send_extended(VexDeviceCommand::ExitFile, Vec::<u8>::from([0b00u8]))?;
 
         // Get the response
         let response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
@@ -100,22 +100,20 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
     pub fn write_vec(&self, offset: u32, data: Vec<u8>) -> Result<()> {
 
         // Pad the payload to have a length that is a multiple of four
-        let data_pad = (data.len() + 3) & !3;
-        let mut data = data.clone();
-        data.resize(data_pad, 0);
-        let data = data;
+        let mut data = data;
+        data.resize((data.len() + 3) & !3, 0x0);
 
         // Create the payload
-        let mut payload = bincode::serialize(&offset)?;
+        let mut payload = bincode::serialize(&(offset))?;
         for b in data {
             payload.push(b);
         }
-
+        
         // Send the write command
-        self.device.borrow_mut().send_extended(VexDeviceCommand::WriteFile, payload)?;
-
+        let _sent = self.device.borrow_mut().send_extended(VexDeviceCommand::WriteFile, payload)?;
+        
         // Recieve and discard the response
-        let _response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::CRC)?;
+        let _response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
         
         Ok(())
     }
@@ -226,7 +224,7 @@ impl<T: Write + Read> VexV5Device<T> {
     /// Opens a file handle on the v5 device
     pub fn open(&mut self, file_name: String, file_metadata: Option<VexInitialFileMetadata>) -> Result<V5FileHandle<T>> {
 
-        /// Convert the name to ascii
+        // Convert the name to ascii
         let file_name = file_name.as_ascii_str()?;
         let mut file_name_bytes: [u8; 24] = [0; 24];
         for (i, b) in file_name.as_slice().iter().enumerate() {
@@ -280,6 +278,7 @@ impl<T: Write + Read> VexV5Device<T> {
         );
         
         let payload = bincode::serialize(&payload)?;
+        
 
         // Send the request
         self.wraps.borrow_mut().send_extended(VexDeviceCommand::OpenFile, payload)?;
@@ -297,7 +296,7 @@ impl<T: Write + Read> VexV5Device<T> {
 
         // If this is opening for write, then 
         // set the linked filename
-        if let VexFileMode::Upload(_, _) = file_metadata.function {
+        /*if let VexFileMode::Upload(_, _) = file_metadata.function {
             // Create the payload
             let payload: (u8, u8, [u8; 24]) = (
                 file_metadata.vid as u8,
@@ -305,11 +304,12 @@ impl<T: Write + Read> VexV5Device<T> {
                 file_name_bytes
             );
             let payload = bincode::serialize(&payload)?;
-
+            
             // Send the command
             self.wraps.borrow_mut().send_extended(VexDeviceCommand::SetLinkedFilename, payload)?;
+            self.wraps.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
 
-        }
+        }*/
         
         // Create the file handle
         let handle = V5FileHandle {

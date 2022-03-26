@@ -111,7 +111,7 @@ impl<T> VexProtocolWrapper<T>
     }
 
     /// Sends an extended packet to the vex device
-    pub fn send_extended(&mut self, command: VexDeviceCommand, data: Vec<u8>) -> Result<usize> {
+    pub fn send_extended(&mut self, command: VexDeviceCommand, data: Vec<u8>) -> Result<Vec<u8>> {
         
         // Create the payload
         let payload = self.create_extended_packet(command, data)?;
@@ -206,7 +206,7 @@ impl<T> VexProtocolWrapper<T>
     }
 
     /// Sends a simple packet to the vex device
-    pub fn send_simple(&mut self, command: VexDeviceCommand, data: Vec<u8>) -> Result<usize>{
+    pub fn send_simple(&mut self, command: VexDeviceCommand, data: Vec<u8>) -> Result<Vec<u8>>{
 
         // Create the packet
         let mut packet = self.create_packet(command);
@@ -226,7 +226,7 @@ impl<T> VexProtocolWrapper<T>
         
         
         // Return the length of the data sent
-        Ok(packet.len())
+        Ok(packet)
     }
 
     /// Creates a simple packet with a magic number
@@ -250,7 +250,8 @@ impl<T> VexProtocolWrapper<T>
         // If the packet is larger than an 8-bit signed integer
         // then split the length into two halves
         if payload_length > 0x80 {
-            packet.extend(payload_length.to_le_bytes())
+            packet.push(((payload_length.overflowing_shr(8).0) | 0x80) as u8);
+            packet.push((payload_length & 0xff) as u8);
         } else {
             packet.push(payload_length as u8);
         }

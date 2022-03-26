@@ -12,7 +12,6 @@ use vex_v5_serial::v5::device::{VexV5Device, VexInitialFileMetadata, VexFileMode
 use anyhow::Result;
 use ascii::AsAsciiStr;
 
-
 fn main() -> Result<()>{
     let port = serialport::new("/dev/ttyACM0", 115200)
         .parity(serialport::Parity::None)
@@ -28,12 +27,13 @@ fn main() -> Result<()>{
 
     
 
-    let file_contents = b"Hello, World!".to_vec();
-
+    let data = b"Hello, Culpeper Team 7122A! This is a really long message that I want to keep really super duper long so that I can test how well my system works. This is because it needs to be longer than 512 bytes so I can test overflow. There are two routes in the code for detecting overflow that I have not tested yet so I will make this 'file' super long. This text is always encoded in ascii for some reason. It could be in UTF-8, but I keep it as ascii for two reasons: Compatibility with other software like RMS and PROS, and so that if you are writign a slot_x.ini the information shows up in the UI correctly. I will copy and pase this a second time.".to_vec();
+    //let data = data[0..512].to_vec();
     // Calculate the crc32
-    let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&file_contents);
+    let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&data);
 
     println!("{:x}", crc32);
+    let addr = 0x3800000;
 
     // Open a file
     let mut file = device.open(
@@ -42,8 +42,8 @@ fn main() -> Result<()>{
             function: VexFileMode::Upload(VexFileTarget::FLASH, true),
             vid: VexVID::USER,
             options: 0,
-            length: file_contents.len() as u32,
-            addr: 0x03800000,
+            length: data.len() as u32,
+            addr,
             crc: crc32,
             r#type: *b"bin\0",
             timestamp: <u32>::try_from(std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH)?.as_secs())?,
@@ -51,7 +51,10 @@ fn main() -> Result<()>{
         })
     )?;
     
-    file.write_vec(0x03800000, file_contents)?;
+    file.write_vec(addr, data)?;
+    
+    
+
     
     // Close the file
     file.close()?;
