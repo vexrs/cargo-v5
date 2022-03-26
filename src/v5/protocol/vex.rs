@@ -4,7 +4,6 @@ use std::time::{Duration, SystemTime};
 use crate::v5::protocol::{
     VEX_CRC16,
     VexDeviceCommand,
-    VexDeviceType,
     VexACKType
 };
 use bitflags::bitflags;
@@ -43,7 +42,6 @@ impl PartialEq<VexDeviceCommand> for u8 {
 #[derive(Clone, Debug)]
 pub struct VexProtocolWrapper<T> 
     where T: Read + Write {
-    device_type: VexDeviceType,
     wraps: T
 }
 
@@ -51,9 +49,8 @@ impl<T> VexProtocolWrapper<T>
     where T: Read + Write {
 
     /// Initializes a new VexProtocolWrapper
-    pub fn new(device_type: VexDeviceType, wraps: T) -> VexProtocolWrapper<T> {
+    pub fn new(wraps: T) -> VexProtocolWrapper<T> {
         VexProtocolWrapper {
-            device_type,
             wraps
         }
     }

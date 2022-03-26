@@ -1,7 +1,7 @@
 use crate::v5::protocol::vex::ResponseCheckFlags;
 use crate::v5::protocol::{
     VexProtocolWrapper,
-    VexDeviceCommand, VEX_CRC32, VEX_CRC16
+    VexDeviceCommand
 };
 use crate::v5::device::{
     V5DeviceVersion, VexProduct,
@@ -12,7 +12,7 @@ use crate::v5::device::{
 use std::io::{Read, Write};
 use std::rc::Rc;
 use std::cell::RefCell;
-use anyhow::{Result, anyhow};
+use anyhow::{Result};
 use ascii::{AsciiString, AsAsciiStr};
 use super::{VexVID, VexFileMetadata, V5ControllerChannel};
 
@@ -21,18 +21,16 @@ use super::{VexVID, VexFileMetadata, V5ControllerChannel};
 /// This represents a file handle
 /// for files on the V5 device.
 #[derive(Clone, Debug)]
-pub struct V5FileHandle<'a, T> 
+pub struct V5FileHandle<T> 
     where T: Read + Write {
     device: Rc<RefCell<VexProtocolWrapper<T>>>,
     pub transfer_metadata: VexFiletransferMetadata,
     pub metadata: VexInitialFileMetadata,
     pub file_name: AsciiString,
-    position: usize,
-    wraps: &'a VexV5Device<T>,
     pub timeout: Option<std::time::Duration>,
 }
 
-impl<'a, T: Write + Read> V5FileHandle<'a, T> {
+impl<T: Write + Read> V5FileHandle<T> {
     /// Closes the file transfer
     pub fn close(&mut self) -> Result<Vec<u8>> {
 
@@ -46,7 +44,6 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         // Return the response data
         Ok(response.1)
     }
-
 
     /// Reads n bytes from the file
     pub fn read_len(&self, offset: u32, n_bytes: u16) -> Result<Vec<u8>> {
@@ -118,7 +115,6 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         Ok(())
     }
 
-
     /// Writes a vector up to the file length of data to the file. 
     /// Ignores any extra bytes at the end of the vector.
     /// Returns the ammount of data read
@@ -173,6 +169,11 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
     }
 }
 
+impl<T: Write + Read> Drop for V5FileHandle<T> {
+    fn drop(&mut self) {
+        self.close().unwrap_or(Vec::<u8>::new());
+    }
+}
 
 
 
@@ -253,11 +254,11 @@ impl<T: Write + Read> VexV5Device<T> {
         // Convert the file name into a static length ascii string of length 24
         let mut file_name_bytes = [0u8; 24];
         let file_name = file_name.as_ascii_str()?;
-        for (i, b) in file_name.as_slice().iter().enumerate() {
+        for (i, byte) in file_name.as_slice().iter().enumerate() {
             if (i + 1) > 23 {
                 break;
             }
-            file_name_bytes[i] = *b as u8;
+            file_name_bytes[i] = *byte as u8;
         }
         file_name_bytes[23] = 0;
 
@@ -281,11 +282,11 @@ impl<T: Write + Read> VexV5Device<T> {
         // Convert the name to ascii
         let file_name = file_name.as_ascii_str()?;
         let mut file_name_bytes: [u8; 24] = [0; 24];
-        for (i, b) in file_name.as_slice().iter().enumerate() {
+        for (i, byte) in file_name.as_slice().iter().enumerate() {
             if (i + 1) > 23 {
                 break;
             }
-            file_name_bytes[i] = *b as u8;
+            file_name_bytes[i] = *byte as u8;
         }
         file_name_bytes[23] = 0;
 
@@ -371,8 +372,6 @@ impl<T: Write + Read> VexV5Device<T> {
             transfer_metadata: response,
             metadata: file_metadata,
             file_name: file_name.to_ascii_string(),
-            position: 0,
-            wraps: self,
             timeout: self.timeout,
         };
 
