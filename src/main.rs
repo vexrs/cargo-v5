@@ -51,7 +51,7 @@ fn main() -> Result<()>{
         })
     )?;
     
-    file.write_vec(addr, data)?;
+    file.write_all(data)?;
     
     
 

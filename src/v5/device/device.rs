@@ -95,9 +95,9 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         Ok(data)
     }
 
-    /// Writes a vector of data to the file
+    /// Writes a vector of data up to max_packet_size to the file
     /// at the specified offset.
-    pub fn write_vec(&self, offset: u32, data: Vec<u8>) -> Result<()> {
+    fn write_some(&self, offset: u32, data: Vec<u8>) -> Result<()> {
 
         // Pad the payload to have a length that is a multiple of four
         let mut data = data;
@@ -116,6 +116,60 @@ impl<'a, T: Write + Read> V5FileHandle<'a, T> {
         let _response = self.device.borrow_mut().receive_extended(self.timeout, ResponseCheckFlags::ALL)?;
         
         Ok(())
+    }
+
+
+    /// Writes a vector up to the file length of data to the file. 
+    /// Ignores any extra bytes at the end of the vector.
+    /// Returns the ammount of data read
+    pub fn write_all(&self, data: Vec<u8>) -> Result<usize> {
+
+        // Save the max size so it is easier to access
+        // We want it to be 3/4 size so we do not have issues with packet headers
+        // going over the max size
+        let max_size = self.transfer_metadata.max_packet_size / 
+        2 + (self.transfer_metadata.max_packet_size / 4);
+        
+        // We will be using the length of the file in the metadata
+        // that way we do not ever write more data than is expected.
+        // However, if the vector is smaller than the file size
+        // Then use the vector size.
+        let size = if data.len() as u32 > self.transfer_metadata.file_size {
+            self.transfer_metadata.file_size
+        } else {
+            data.len() as u32
+        };
+
+        
+
+        // We will be incrementing this variable so we know how much we have written
+        let mut how_much: usize = 0;
+        
+        // Iterate over the file's length in steps of max_size
+        // We will be writing each iteration.
+        for i in (0..size as usize).step_by(max_size.into()) {
+            // Determine the packet size. We do not want to write
+            // max_size bytes if we are at the end of the file
+            let packet_size = if size < max_size as u32 {
+                size as u16
+            } else if i as u32 + max_size as u32 > size {
+                (size - i as u32) as u16
+            } else {
+                max_size
+            };
+
+            // Cut out packet_size bytes out of the provided buffer
+            let payload = data[i..i+packet_size as usize].to_vec();
+
+            // Write the payload to the file
+            self.write_some(self.metadata.addr + i as u32, payload)?;
+
+            // Increment how_much by packet data so we know how much we
+            // have written to the file
+            how_much += packet_size as usize;
+        }
+
+        Ok(how_much)
     }
 }
 
