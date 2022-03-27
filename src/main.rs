@@ -52,7 +52,7 @@ fn main() -> Result<()>{
             let ports = discover_v5_ports()?;
             
             
-            let port = device_override.unwrap_or(ports[0].clone().port_name);
+            let port = device_override.unwrap_or_else(||{ports[0].clone().port_name});
 
             // Open it
             let port = serialport::new(port, 115200)
