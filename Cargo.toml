@@ -2,6 +2,7 @@
 name = "cargo-v5"
 version = "0.1.0"
 edition = "2021"
+description = "Cargo utility for uploading projects to the vex v5 brain."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

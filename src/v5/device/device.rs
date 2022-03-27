@@ -1,7 +1,7 @@
 use crate::v5::protocol::vex::ResponseCheckFlags;
 use crate::v5::protocol::{
     VexProtocolWrapper,
-    VexDeviceCommand, VexFiletransferFinished
+    VexDeviceCommand, VexFiletransferFinished, VEX_CRC32
 };
 use crate::v5::device::{
     V5DeviceVersion, VexProduct,
@@ -171,7 +171,7 @@ impl<T: Write + Read> V5FileHandle<T> {
 
 impl<T: Write + Read> Drop for V5FileHandle<T> {
     fn drop(&mut self) {
-        self.close().unwrap_or(Vec::<u8>::new());
+        self.close(VexFiletransferFinished::DoNothing).unwrap_or(Vec::<u8>::new());
     }
 }
 
@@ -377,6 +377,45 @@ impl<T: Write + Read> VexV5Device<T> {
 
         // Return the handle
         Ok(handle)
+    }
+
+    /// Uploads a file to the v5 device
+    pub fn upload_file(&mut self, file_name: String, data: Vec<u8>, on_finished: VexFiletransferFinished) -> Result<()> {
+
+        // Switch to download channel
+        self.switch_channel(Some(V5ControllerChannel::DOWNLOAD))?;
+
+        // Get the crc32 of the file
+        let crc32 = crc::Crc::<u32>::new(&VEX_CRC32).checksum(&data);
+
+        // Open the file
+        let mut file = self.open(
+            file_name.to_string(),
+            Some(VexInitialFileMetadata {
+                function: VexFileMode::Upload(VexFileTarget::FLASH, true),
+                vid: VexVID::USER,
+                options: 0,
+                length: data.len() as u32,
+                addr: 0x3800000,
+                crc: crc32,
+                r#type: *b"bin\0",
+                timestamp: <u32>::try_from(std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH)?.as_secs())?,
+                version: 0x01000000,
+            })
+        )?;
+
+
+        // Write the data
+        file.write_all(data)?;
+
+        // Close the file
+        file.close(on_finished)?;
+
+        // Switch back to pit channel
+        self.switch_channel(Some(V5ControllerChannel::PIT))?;
+
+
+        Ok(())
     }
 
     /// Checks if the device is a controller connected to the brain wirelessly.

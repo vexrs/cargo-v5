@@ -30,7 +30,7 @@ fn main() -> Result<()>{
     let port = ports[0].clone();
 
     // Open it
-    let port = serialport::open(&port.port_name, 115200)
+    let port = serialport::new(&port.port_name, 115200)
         .parity(serialport::Parity::None)
         .timeout(std::time::Duration::new(5, 0))
         .stop_bits(serialport::StopBits::One).open()?;
@@ -42,15 +42,24 @@ fn main() -> Result<()>{
     // And create a device to use with it
     let device = VexV5Device::new(wrapper);
 
+    let args: Vec<String> = std::env::args().collect();
+
+    // If argument 1 is cargo then remove it
+    let args = if args[1] == "v5" {
+        args[1..].to_vec()
+    } else {
+        args
+    };
+
     // Parse the args
-    let args = V5::parse();
+    let args = V5::parse_from(args);
 
     // Match on subcommand
     match args.command {
         Commands::Upload { run, slot } => {
             let slot = slot.unwrap_or(1);
 
-            upload::upload(device, slot, run)
+            upload::upload(device, slot, run)?;
         }
     }
 
