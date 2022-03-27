@@ -27,6 +27,7 @@ enum Commands {
 fn main() -> Result<()>{
     // Just use the first vex port we find.
     let ports = discover_v5_ports()?;
+    
     let port = ports[0].clone();
 
     // Open it
