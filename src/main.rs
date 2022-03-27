@@ -16,32 +16,20 @@ enum Commands {
     /// Uploads this program to the v5
     #[clap()]
     Upload {
+        #[clap(short, long)]
+        slot: Option<u8>,
+        #[clap(short, long)]
+        device_override: Option<String>,
         #[clap(short = 'r', long = "run")]
         run: bool,
-        slot: Option<u8>,
+        
     },
 }
 
 
 
 fn main() -> Result<()>{
-    // Just use the first vex port we find.
-    let ports = discover_v5_ports()?;
     
-    let port = ports[0].clone();
-
-    // Open it
-    let port = serialport::new(&port.port_name, 115200)
-        .parity(serialport::Parity::None)
-        .timeout(std::time::Duration::new(5, 0))
-        .stop_bits(serialport::StopBits::One).open()?;
-    
-
-    // Create a protocol wrapper
-    let wrapper = VexProtocolWrapper::new(port);
-
-    // And create a device to use with it
-    let device = VexV5Device::new(wrapper);
 
     let args: Vec<String> = std::env::args().collect();
 
@@ -57,12 +45,31 @@ fn main() -> Result<()>{
 
     // Match on subcommand
     match args.command {
-        Commands::Upload { run, slot } => {
+        Commands::Upload { run, slot , device_override} => {
             let slot = slot.unwrap_or(1);
 
-            upload::upload(device, slot, run)?;
-        }
-    }
+            // Just use the first vex port we find OR use the port selected by override.
+            let ports = discover_v5_ports()?;
+            
+            
+            let port = device_override.unwrap_or(ports[0].clone().port_name);
+
+            // Open it
+            let port = serialport::new(port, 115200)
+                .parity(serialport::Parity::None)
+                .timeout(std::time::Duration::new(5, 0))
+                .stop_bits(serialport::StopBits::One).open()?;
+
+
+            // Create a protocol wrapper
+            let wrapper = VexProtocolWrapper::new(port);
+
+            // And create a device to use with it
+            let device = VexV5Device::new(wrapper);
+
+                    upload::upload(device, slot, run)?;
+                }
+            }
 
     /*
     let port = serialport::new("/dev/ttyACM0", 115200)
