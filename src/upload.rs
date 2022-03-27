@@ -1,4 +1,4 @@
-use vex_v5_serial::v5::device::{VexV5Device, VexInitialFileMetadata};
+use vex_v5_serial::v5::device::{VexV5Device};
 use vex_v5_serial::v5::protocol::VexFiletransferFinished;
 use std::path::Path;
 use anyhow::Result;
