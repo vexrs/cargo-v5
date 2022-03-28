@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 description = "Cargo utility for uploading projects to the vex v5 brain."
 build = "build.rs"
+license-file = "LICENSE"
+homepage = "https://github.com/Culpeper-Robotics/cargo-v5"
+repository = "https://github.com/Culpeper-Robotics/cargo-v5"
+readme = "README.md"
+categories = ["science::robotics", "command-line-utilities", "development-tools::cargo-plugins", "development-tools::build-utils"]
+keywords = ["vex", "v5", "robotics", "cargo", "VRC"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -14,7 +14,7 @@ rustup install nightly
 rustup component add rust-src --toolchain nightly
 sudo apt install libudev-dev libclang-dev
 export LIBV5_PATH="/path/to/libv5rt/sdk/"
-cargo install --git https://github.com/Culpeper-Robotics/cargo-v5
+cargo install cargo-v5
 ```
 
 ## Usage
