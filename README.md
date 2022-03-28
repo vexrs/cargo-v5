@@ -21,6 +21,22 @@ export LIBV5_PATH="/path/to/libv5rt/sdk/"
 cargo install cargo-v5
 ```
 
+### Windows
+
+Set LIBV5_PATH and install with cargo:
+```powershell
+$Env:LIBV5_PATH="C:\Program Files (x86)\VEX Robotics\VEXcode Pro V5"
+cargo install cargo-v5
+```
+
+You will also need to set LIBCLANG_PATH:
+1. Search for env in the search bar and select "Edit the system environment variables"
+2. Click on "Environment Variables"
+3. Under the top box for user variables, click new.
+4. Set the variable name to "LIBCLANG_PATH" (without quotes)
+5. Set the variable value to the path to libclang.
+6. Press OK.
+
 ## Usage
 
 Create a rust crate:
