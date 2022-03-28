@@ -1,6 +1,9 @@
-mod device;
+mod inner_device;
+pub use inner_device::{
+    VexV5Device, V5FileHandle
+};
+
 use chrono::TimeZone;
-pub use device::VexV5Device;
 use bitflags::bitflags;
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, anyhow};
@@ -127,9 +130,10 @@ pub enum VexProduct {
     V5Controller(V5ControllerFlags),
 }
 
-impl Into<u8> for VexProduct {
-    fn into(self) -> u8 {
-        match self {
+impl From<VexProduct> for u8 {
+    
+    fn from(product: VexProduct) -> u8 {
+        match product {
             VexProduct::V5Brain(_) => 0x10,
             VexProduct::V5Controller(_) => 0x11,
         }

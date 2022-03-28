@@ -187,7 +187,7 @@ impl<T> VexProtocolWrapper<T>
 
         // Read in the rest of the payload
         let mut payload: Vec<u8> = vec![0; length.into()];
-        self.wraps.read(&mut payload)?; // We do not care about size here. Some commands may send less data than needed.
+        self.wraps.read_exact(&mut payload)?;
         rx.extend(payload.clone());
 
         // Try to convert the command into it's enum format
@@ -209,11 +209,11 @@ impl<T> VexProtocolWrapper<T>
         let mut packet = self.create_packet(command);
 
         // Add the data to the packet
-        packet.append(&mut data.clone());
+        packet.extend(data);
         
         
         // Write the data
-        self.wraps.write_all(&mut packet)?;
+        self.wraps.write_all(&packet)?;
         
 
         // Flush all pending writes on the buffer.
@@ -237,9 +237,7 @@ impl<T> VexProtocolWrapper<T>
     /// Creates an extended packet
     fn create_extended_packet(&self, command: VexDeviceCommand, payload: Vec<u8>) -> Result<Vec<u8>> {
 
-        let mut packet = Vec::<u8>::new();
-
-        packet.push(command as u8);
+        let mut packet = vec![command as u8];
 
         // Cache this value because it will not change.
         let payload_length: u16 = payload.len().try_into()?;
@@ -254,8 +252,7 @@ impl<T> VexProtocolWrapper<T>
         }
 
         // Add the payload
-        let mut pc = payload.clone();
-        packet.append(&mut pc);
+        packet.extend(payload);
 
         // Generate the payload as it would appear when sent over the wire
         let mut payload_proper = Vec::<u8>::new();

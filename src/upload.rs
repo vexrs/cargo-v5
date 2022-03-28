@@ -33,7 +33,7 @@ pub fn upload<T: Read + Write>(mut device: VexV5Device<T>, slot: u8, run: bool, 
     
     // If the upload_file does not have an extension .bin then objcopy it
     // into a binary file
-    let upload_file = if !upload_file.clone().ends_with(".bin") {
+    let upload_file = if !upload_file.ends_with(".bin") {
         // If this is a windows system, then use the objcopy that comes
         // with vexcode.
         // If it is a unix system, then use the objcopy in the path.
@@ -54,7 +54,7 @@ pub fn upload<T: Read + Write>(mut device: VexV5Device<T>, slot: u8, run: bool, 
         command.arg(upload_file.clone());
 
         // Set the output file to the upload_file with the .bin extension
-        let mut output_file = upload_file.clone();
+        let mut output_file = upload_file;
         output_file.push_str(".bin");
         command.arg(output_file.clone());
 
@@ -88,10 +88,10 @@ pub fn upload<T: Read + Write>(mut device: VexV5Device<T>, slot: u8, run: bool, 
 
     // Create the ini file
     let mut ini = Vec::<String>::new();
-    ini.push(format!("[program]"));
+    ini.push("[program]".to_string());
     ini.push(format!("name = \"{}\"", parsed_toml.package.name));
     ini.push(format!("version = \"{}\"", parsed_toml.package.version));
-    ini.push(format!("description = \"{}\"", parsed_toml.package.description.unwrap_or("".to_string())));
+    ini.push(format!("description = \"{}\"", parsed_toml.package.description.unwrap_or_else(||{"".to_string()})));
     ini.push(format!("slot = {}", slot - 1));
     ini.push(format!("date = {}", time_fmt));
 
@@ -119,7 +119,7 @@ pub fn upload<T: Read + Write>(mut device: VexV5Device<T>, slot: u8, run: bool, 
     file.read_to_end(&mut contents)?;
     
     // Get the upload_file's filename
-    let filename = Path::new(&upload_file.clone()).file_name().unwrap().to_string_lossy().to_string();
+    let filename = Path::new(&upload_file).file_name().unwrap().to_string_lossy().to_string();
 
     // Upload the file
     device.upload_file(

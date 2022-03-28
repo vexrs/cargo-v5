@@ -171,7 +171,7 @@ impl<T: Write + Read> V5FileHandle<T> {
 
 impl<T: Write + Read> Drop for V5FileHandle<T> {
     fn drop(&mut self) {
-        self.close(VexFiletransferFinished::DoNothing).unwrap_or(Vec::<u8>::new());
+        self.close(VexFiletransferFinished::DoNothing).unwrap_or_default();
     }
 }
 
@@ -291,7 +291,7 @@ impl<T: Write + Read> VexV5Device<T> {
         file_name_bytes[23] = 0;
 
         // Resolve the file metadata to it's default value
-        let file_metadata = file_metadata.unwrap_or(VexInitialFileMetadata::default());
+        let file_metadata = file_metadata.unwrap_or_default();
 
         // Get a tuple from the file function
         let ft: (u8, u8, u8) = match file_metadata.function {
@@ -312,13 +312,14 @@ impl<T: Write + Read> VexV5Device<T> {
         };
 
         // Pack the payload together
-        let payload: (
+        type FileOpenPayload = (
             u8, u8, u8, u8,
             u32, u32, u32,
             [u8; 4],
             u32, u32,
             [u8; 24],
-        ) = (
+        );
+        let payload: FileOpenPayload  = (
             ft.0,
             ft.1,
             file_metadata.vid as u8,
@@ -390,7 +391,7 @@ impl<T: Write + Read> VexV5Device<T> {
 
         // Open the file
         let mut file = self.open(
-            file_name.to_string(),
+            file_name,
             Some(VexInitialFileMetadata {
                 function: VexFileMode::Upload(VexFileTarget::FLASH, true),
                 vid: VexVID::USER,
