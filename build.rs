@@ -26,7 +26,7 @@ fn main() -> Result<()> {
         let libv5_path = libv5_path.unwrap();
 
         // Make the path to the libv5_dir
-        let libv5_dir = data_dir.join("libv5rt").join("sdk");
+        let libv5_dir = data_dir.join("libv5rt");
         
         // If it does not exist, create it
         if !libv5_dir.exists() {
@@ -34,7 +34,9 @@ fn main() -> Result<()> {
         }
 
         // Copy all files from libv5_path to the data directory
-        fs_extra::dir::copy(libv5_path, libv5_dir, &fs_extra::dir::CopyOptions::new())?;
+        let mut co = fs_extra::dir::CopyOptions::new();
+        co.content_only = true;
+        fs_extra::dir::copy(libv5_path, libv5_dir, &co)?;
 
         // Create the .v5init file
         std::fs::write(&init_file, "")?;

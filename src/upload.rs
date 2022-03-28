@@ -21,7 +21,52 @@ struct CargoToml {
 
 
 
-pub fn upload<T: Read + Write>(mut device: VexV5Device<T>, slot: u8, run: bool) -> Result<()> {
+pub fn upload<T: Read + Write>(mut device: VexV5Device<T>, slot: u8, run: bool, upload_file: String) -> Result<()> {
+    
+    // Get the .v5 directory
+    let v5_dir = dirs::home_dir().unwrap().join(".v5");
+
+    // If it does not exist then error
+    if !v5_dir.exists() {
+        return Err(anyhow::anyhow!("No HOME/.v5 directory found. Please re-install cargo-v5 to fix this."));
+    }
+    
+    // If the upload_file does not have an extension .bin then objcopy it
+    // into a binary file
+    let upload_file = if !upload_file.clone().ends_with(".bin") {
+        // If this is a windows system, then use the objcopy that comes
+        // with vexcode.
+        // If it is a unix system, then use the objcopy in the path.
+        let command = if cfg!(windows) {
+            let dir = v5_dir.join("libv5rt/toolchain/vexv5/win32/gcc/bin/arm-none-eabi-objcopy.exe");
+            let str = dir.to_str();
+            let str = str.unwrap_or("arm-none-eabi-objcoppy");
+            str.to_string()
+        } else {
+           "arm-none-eabi-objcopy".to_string()
+        };
+        
+        // Create the objcopy command
+        let mut command = std::process::Command::new(command);
+        command.arg("-O").arg("binary");
+
+        // Add the upload file path
+        command.arg(upload_file.clone());
+
+        // Set the output file to the upload_file with the .bin extension
+        let mut output_file = upload_file.clone();
+        output_file.push_str(".bin");
+        command.arg(output_file.clone());
+
+        // Run the command
+        command.output()?;
+
+        output_file
+    } else {
+        upload_file
+    };
+    
+    
     // Try to find a Cargo.toml in the current directory
     let cargo = Path::new("./Cargo.toml");
 
@@ -34,17 +79,6 @@ pub fn upload<T: Read + Write>(mut device: VexV5Device<T>, slot: u8, run: bool) 
     let f = std::fs::read_to_string(cargo)?;
     let parsed_toml = toml::from_str::<CargoToml>(&f)?;
     
-
-
-    // Get the environment variable for the upload file
-    let upload_file = std::env::var("VEX_UPLOAD_FILE");
-
-    // If it is none, we can not upload
-    if upload_file.is_err() {
-        return Err(anyhow::anyhow!("Could not find VEX_UPLOAD_FILE environment variable"));
-    }
-
-    let upload_file = upload_file.unwrap();
 
     // Get the time
     let time = SystemTime::now();

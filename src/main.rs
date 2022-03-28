@@ -22,6 +22,7 @@ enum Commands {
         device_override: Option<String>,
         #[clap(short = 'r', long = "run")]
         run: bool,
+        file: String,
         
     },
 }
@@ -34,7 +35,9 @@ fn main() -> Result<()>{
     let args: Vec<String> = std::env::args().collect();
 
     // If argument 1 is cargo then remove it
-    let args = if args[1] == "v5" {
+    let args = if args.len() < 2 {
+        args
+    } else if args[1] == "v5" {
         args[1..].to_vec()
     } else {
         args
@@ -45,7 +48,7 @@ fn main() -> Result<()>{
 
     // Match on subcommand
     match args.command {
-        Commands::Upload { run, slot , device_override} => {
+        Commands::Upload { run, slot , device_override, file} => {
             let slot = slot.unwrap_or(1);
 
             // Just use the first vex port we find OR use the port selected by override.
@@ -67,7 +70,7 @@ fn main() -> Result<()>{
             // And create a device to use with it
             let device = VexV5Device::new(wrapper);
 
-                    upload::upload(device, slot, run)?;
+                    upload::upload(device, slot, run, file)?;
                 }
             }
 
