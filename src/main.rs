@@ -54,6 +54,13 @@ fn main() -> Result<()>{
             // Just use the first vex port we find OR use the port selected by override.
             let ports = discover_v5_ports()?;
             
+            // If we are using wsl, then device override should automatically be set to /dev/ttyACM0
+            let device_override = if device_override.is_none() && wsl::is_wsl() {
+                Some("/dev/ttyACM0".to_string())
+            } else {
+                device_override
+            };
+            
             
             let port = device_override.unwrap_or_else(||{ports[0].clone().port_name});
 
