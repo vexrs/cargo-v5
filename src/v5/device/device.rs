@@ -199,9 +199,9 @@ impl<T: Write + Read> VexV5Device<T> {
     
         // Set our default timeout based on wireless status
         dev.timeout  = if dev.is_wireless().unwrap_or(false) {
-            Some(std::time::Duration::new(5,0))
+            Some(std::time::Duration::new(7,0))
         } else {
-            None
+            Some(std::time::Duration::new(3,0))
         };
 
         dev
