@@ -1,9 +1,13 @@
 # cargo-v5
-A cargo subcommand for uploading programs to the Vex V5 robot brain.
+![GitHub](https://img.shields.io/github/license/Culpeper-Robotics/cargo-v5?style=flat-square)
+![GitHub repo size](https://img.shields.io/github/repo-size/Culpeper-Robotics/cargo-v5?style=flat-square)
+![Crates.io](https://img.shields.io/crates/v/cargo-v5?style=flat-square)
+![Libraries.io dependency status for latest release](https://img.shields.io/librariesio/release/cargo/cargo-v5?style=flat-square)
 
 
-This is designed for use with this project template: [vex-v5-template](https://github.com/Culpeper-Robotics/vex-v5-template).
-This is only confirmed to work on Ubuntu Linux.
+A lightweight cargo subcommand for uploading programs to the Vex V5 robot brain.
+This is only known to work on Ubuntu Linux, although there should be no platform-specific code.
+
 
 ## Installation
 
