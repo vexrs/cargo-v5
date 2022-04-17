@@ -5,59 +5,21 @@
 ![Libraries.io dependency status for latest release](https://img.shields.io/librariesio/release/cargo/cargo-v5?style=flat-square)
 
 
-A lightweight cargo subcommand for uploading programs to the Vex V5 robot brain.
-This is only known to work on Ubuntu Linux, although there should be no platform-specific code.
+Cargo-v5 is a cargo subcommand for interacting with the Vex V5 robot brain.
+Vex Software and Hardware was *NOT* reverse engineered to create this project. The protocol specification was derived from [PROS](https://pros.cs.purdue.edu), another piece of open source software that is targeted towards using C and C++ for programming Vex robotics. If you would prefer to use those two languages or are looking for a more complete and less minimal programming system, I would recommend you use PROS.
 
+Not affiliated with Innovation First Inc.
 
-## Installation
-
-
-### Ubuntu linux
-```bash
-rustup install nightly
-rustup component add rust-src --toolchain nightly
-sudo apt install libudev-dev libclang-dev
-export LIBV5_PATH="/path/to/libv5rt/sdk/"
-cargo install cargo-v5
-```
-
-### Windows
-
-Set LIBV5_PATH and install with cargo:
-```powershell
-$Env:LIBV5_PATH="C:\Program Files (x86)\VEX Robotics\VEXcode Pro V5"
-cargo install cargo-v5
-```
-
-You will also need to set LIBCLANG_PATH:
-1. Search for env in the search bar and select "Edit the system environment variables"
-2. Click on "Environment Variables"
-3. Under the top box for user variables, click new.
-4. Set the variable name to "LIBCLANG_PATH" (without quotes)
-5. Set the variable value to the path to libclang.
-6. Press OK.
 
 ## Usage
 
-Create a rust crate:
+In order to download a valid program to the V5 brain, you will need to a vex target:
 ```bash
-mkdir project-name
-cd project-name
-cargo init
-```
-
-Download the vex toolchain file to your project's root directory:
-```
+# This is slightly modified from the target found here: https://gitlab.com/qvex/vex-rt/-/blob/master/armv7a-vex-eabi.json
 wget https://gist.githubusercontent.com/wireboy5/5bb41fe7bc8a0469635e56a3076946bf/raw/6699b6bed011447c724a4589dc3acb1e2ce61585/armv7a-vex-eabi.json
 ```
 
-Create a cargo config for your project:
-```bash
-mkdir .cargo
-touch .cargo/config
-```
-
-Add these contents:
+You can also add these contents to your cargo config file for convienience:
 ```toml
 [build]
 target = ".v5/armv7a-vex-eabi.json"
@@ -70,18 +32,4 @@ runner = "cargo v5 upload --run"
 ```
 
 Now if you run `cargo run` it will compile and run your project on the v5 brain.
-These instructions can be adapted to work for windows.
-You can use a library such as [vexv5rt](https://github.com/Culpeper-Robotics/vexv5rt) to interface with the v5 brain and devices.
 
-## WSL Usage
-
-This project works under an Ubuntu WSL2 installation. However, every time you plug in the v5 brain or controller you will need to forward the usb device to WSL.
-Open Powershell as administrator, and run this command to find the vex device:
-```powershell
-usbipd wsl list
-```
-Once you have found the busid of your device (the two hyphenated numbers on the left of the device name) then you can attach the device to your WSL instance:
-```powershell
-usbipd wsl attach --busid {busid}
-```
-This last command can be run without checking the busid as long as you are not connecting and reconnecting other devices.
