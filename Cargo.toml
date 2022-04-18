@@ -18,5 +18,5 @@ crc = "2.1.0"
 dialoguer = "0.10.0"
 indicatif = "0.16.2"
 serialport = "4.1.0"
-spinners = "3.1.0"
+spinners = "3.0.1"
 vexv5_serial = { git = "ssh://git@github.com/Culpeper-Robotics/vexv5_serial"}

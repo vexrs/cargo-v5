@@ -3,10 +3,11 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use util::DevicePair;
-use vexv5_serial::{protocol::V5Protocol, device::VexDevice};
-use spinners::{Spinner, Spinners};
+use vexv5_serial::device::VexDevice;
+
 
 mod util;
+mod files;
 
 
 #[derive(Parser, Debug)]
@@ -71,9 +72,6 @@ fn main() -> Result<()>{
 
     
     let mut device = VexDevice::new(system, user)?; 
-
-
-
     
     device.with_channel(vexv5_serial::device::V5ControllerChannel::UPLOAD, |d| {
         let name = "test.txt";
@@ -85,48 +83,15 @@ fn main() -> Result<()>{
         // Read in the data from the file
         let data = std::fs::read(name)?;
 
-        // Write to the slot_1.ini file on the brain
-        let mut fh = d.open(name.to_string(), Some(vexv5_serial::device::VexInitialFileMetadata {
-            function: vexv5_serial::device::VexFileMode::Upload(vexv5_serial::device::VexFileTarget::FLASH, true),
-            vid: vexv5_serial::device::VexVID::USER,
-            options: 0,
-            length: data.len() as u32,
-            addr: 0x3800000,
-            crc: crc::Crc::<u32>::new(&vexv5_serial::protocol::VEX_CRC32).checksum(&data),
-            r#type: *b"bin\0",
-            timestamp: 0,
-            version: 0x01000000,
-            linked_name: None,
-        }))?;
+        files::upload_file(d, name.to_string(), data)?;
 
         
-
-        // Write data
-        util::write_file_progress(&mut fh, data)?;
-        
-        // We are doing a file transfer, so it may take some time for the final response.
-        // Just increase the timeout here
-        d.set_timeout(Some(Duration::new(15, 0)));
-
-        // We will also setup a spinner so the user knows that the application has not frozen.
-        let sp = Spinner::new(Spinners::Dots, "Closing File Handle".to_string());
-
-        // Close file
-        fh.close(vexv5_serial::device::VexFiletransferFinished::ShowRunScreen)?;
-        
-        // And stop the spinner
-        sp.stop();
-
-        // Reset the timeout to default
-        d.set_timeout(None);
-
         
 
         Ok(())
     })?;
     
-    // Add an extra newline to avoid some weirdness
-    print!("\n");
+    
 
     Ok(())
 }
