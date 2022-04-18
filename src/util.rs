@@ -61,7 +61,6 @@ pub fn find_devices() -> Result<DevicePair> {
     let device = if pairs.len() == 1 {
         pairs[0].clone()
     } else {
-        let device = pairs[0].clone();
 
         // Generate a list of selections (just differently formatted devices)
         let mut pselect = Vec::<String>::new();
@@ -159,7 +158,7 @@ pub fn write_file_progress<T: Read + Write>(handle: &mut V5FileHandle<T>, data: 
     }
 
     // Finalize the progress bar
-    bar.finish();
+    bar.finish_and_clear();
 
     Ok(how_much)
 }
