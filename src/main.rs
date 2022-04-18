@@ -1,8 +1,5 @@
-use std::time::Duration;
-
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use util::DevicePair;
 use vexv5_serial::device::VexDevice;
 
 
@@ -21,6 +18,16 @@ struct Args {
 enum Commands {
     /// Opens a terminal connection to the v5 brain
     Terminal {},
+    /// Downloads a file from the brain
+    Download {
+        /// The file to download
+        file: String
+    },
+    /// Uploads a file to the brain
+    Upload {
+        /// The file to upload
+        file: String
+    },
 }
 
 
@@ -32,71 +39,33 @@ fn main() -> Result<()>{
     // Parse arguments
     let args = Args::parse();
 
-
+    // Find and prepare the raw device to use
     let device = util::find_devices()?;
+    let (system, user) = util::prepare_device(device)?;
+    
+    // Create the wrapper
+    let mut device = VexDevice::new(system, user)?;
 
-    let (mut system, mut user) = match device {
-        DevicePair::Double(d1, d2) => {
-            (
-                (
-                    d1.clone(),
-                    serialport::new(d1.port_info.port_name, 115200)
-                    .parity(serialport::Parity::None)
-                    .timeout(Duration::new(vexv5_serial::device::SERIAL_TIMEOUT_SECONDS, vexv5_serial::device::SERIAL_TIMEOUT_NS))
-                    .stop_bits(serialport::StopBits::One).open()?
-                ),
-                Some(
-                    (
-                        d2.clone(),
-                        serialport::new(d2.port_info.port_name, 115200)
-                            .parity(serialport::Parity::None)
-                            .timeout(Duration::new(vexv5_serial::device::SERIAL_TIMEOUT_SECONDS, vexv5_serial::device::SERIAL_TIMEOUT_NS))
-                            .stop_bits(serialport::StopBits::One).open()?
-                    )
-                ),
-            )
+    // Match which command to use
+    match args.command {
+        Commands::Terminal {} => {
+            println!("Not Implemented");
         },
-        DevicePair::Single(d1) => {
-            (
-                (
-                    d1.clone(),
-                    serialport::new(d1.port_info.port_name, 115200)
-                        .parity(serialport::Parity::None)
-                        .timeout(Duration::new(vexv5_serial::device::SERIAL_TIMEOUT_SECONDS, vexv5_serial::device::SERIAL_TIMEOUT_NS))
-                        .stop_bits(serialport::StopBits::One).open()?
-                ),
-                None
-            )
-        }
-    };
+        Commands::Download { file } => {
+            // Download the file
+            let data = files::download_file(&mut device, file.clone())?;
 
-    // Set the DTR line to high on both ports
-    system.1.write_data_terminal_ready(true)?;
-    if let Some(ref mut user) = user {
-        user.1.write_data_terminal_ready(true)?;
+            // Write the file to disk
+            std::fs::write(file, data)?;
+        },
+        Commands::Upload { file } => {
+            // Read the data from disk
+            let data = std::fs::read(file.clone())?;
+
+            // Upload the file
+            files::upload_file(&mut device, file, data)?;
+        },
     }
-
-    let mut device = VexDevice::new(system, user)?; 
-    
-    device.with_channel(vexv5_serial::device::V5ControllerChannel::UPLOAD, |d| {
-        let name = "test.txt";
-        // Get the info of slot_1.ini
-        //let metadata = d.file_metadata_from_name(name.to_string(), None, None)?;
-
-        
-        
-        // Read in the data from the file
-        let data = std::fs::read(name)?;
-
-        files::upload_file(d, name.to_string(), data)?;
-
-        
-        
-
-        Ok(())
-    })?;
-    
-    
 
     Ok(())
 }

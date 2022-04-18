@@ -1,6 +1,6 @@
-use std::{io::{Read, Write}};
+use std::{io::{Read, Write}, time::Duration};
 
-use serialport::SerialPortType;
+use serialport::{SerialPortType, SerialPort};
 use vexv5_serial::{ports::{VexSerialInfo, VexSerialClass}, device::V5FileHandle};
 use console::style;
 use dialoguer::{
@@ -18,7 +18,7 @@ pub enum DevicePair {
     Double(VexSerialInfo, VexSerialInfo)
 }
 
-
+/// Finds which vex devices to use
 pub fn find_devices() -> Result<DevicePair> {
     // Try to find vex devices
     let devices = vexv5_serial::ports::discover_vex_ports()?;
@@ -93,6 +93,56 @@ pub fn find_devices() -> Result<DevicePair> {
     };
 
     Ok(device)
+}
+
+
+/// A prepared device ready to be used
+type PreparedDevice = ((VexSerialInfo, Box<dyn SerialPort>), Option<(VexSerialInfo, Box<dyn SerialPort>)>);
+
+/// Prepares a device for use
+pub fn prepare_device(device: DevicePair) -> Result<PreparedDevice> {
+    let (mut system, mut user) = match device {
+        DevicePair::Double(d1, d2) => {
+            (
+                (
+                    d1.clone(),
+                    serialport::new(d1.port_info.port_name, 115200)
+                    .parity(serialport::Parity::None)
+                    .timeout(Duration::new(vexv5_serial::device::SERIAL_TIMEOUT_SECONDS, vexv5_serial::device::SERIAL_TIMEOUT_NS))
+                    .stop_bits(serialport::StopBits::One).open()?
+                ),
+                Some(
+                    (
+                        d2.clone(),
+                        serialport::new(d2.port_info.port_name, 115200)
+                            .parity(serialport::Parity::None)
+                            .timeout(Duration::new(vexv5_serial::device::SERIAL_TIMEOUT_SECONDS, vexv5_serial::device::SERIAL_TIMEOUT_NS))
+                            .stop_bits(serialport::StopBits::One).open()?
+                    )
+                ),
+            )
+        },
+        DevicePair::Single(d1) => {
+            (
+                (
+                    d1.clone(),
+                    serialport::new(d1.port_info.port_name, 115200)
+                        .parity(serialport::Parity::None)
+                        .timeout(Duration::new(vexv5_serial::device::SERIAL_TIMEOUT_SECONDS, vexv5_serial::device::SERIAL_TIMEOUT_NS))
+                        .stop_bits(serialport::StopBits::One).open()?
+                ),
+                None
+            )
+        }
+    };
+
+    // Set the DTR line to high on both ports
+    system.1.write_data_terminal_ready(true)?;
+    if let Some(ref mut user) = user {
+        user.1.write_data_terminal_ready(true)?;
+    }
+
+    Ok((system, user))
 }
 
 /// Writes a vector up to the file length of data to the file. 
