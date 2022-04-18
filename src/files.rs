@@ -1,14 +1,33 @@
 use std::{io::{Read, Write}, time::Duration};
 
 use console::style;
-use indicatif::ProgressBar;
-use vexv5_serial::device::VexDevice;
+use dialoguer::Confirm;
+use indicatif::{ProgressBar, HumanBytes, HumanDuration};
+use vexv5_serial::device::{VexDevice, VexProduct, V5DeviceVersion};
 use anyhow::Result;
 
 use crate::util;
 
 /// Writes data to a file on the V5 brain.
 pub fn upload_file<T: Read + Write>(device: &mut VexDevice<T>, file_name: String, data: Vec<u8>) -> Result<()> {
+
+    // If the file size is too large (lets say 16 KiB) and the device is a controller
+    // then prompt before downloading.
+    if let V5DeviceVersion{system_version: _, product_type: VexProduct::V5Controller(_) } = device.get_device_version()? {
+        if data.len() > 16384 {
+            let prompt = format!(
+                "You are uploading a large ({}) file wirelessly. This is projected to take {} to complete. Are you sure you want to continue?",
+                HumanBytes(data.len() as u64).to_string(),
+                HumanDuration(Duration::from_secs(data.len() as u64 / 1024)).to_string() // The average download speed at close range is ~1 KiB/s
+            );
+            if Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default()).with_prompt(prompt).interact()? {
+                // Continue
+            } else {
+                // Abort
+                return Ok(());
+            }
+        }
+    }
 
     // Begin timer
     let time = std::time::SystemTime::now();
@@ -80,6 +99,24 @@ pub fn download_file<T: Read + Write>(device: &mut VexDevice<T>, file_name: Stri
     // Retrieve the file metadata
     let metadata = device.file_metadata_from_name(file_name.clone(), None, None)?;
 
+    // If the file size is too large (lets say 16 KiB) and the device is a controller
+    // then prompt before downloading.
+    if let V5DeviceVersion{system_version: _, product_type: VexProduct::V5Controller(_) } = device.get_device_version()? {
+        if metadata.size > 16384 {
+            let prompt = format!(
+                "You are downloading a large ({}) file wirelessly. This is projected to take {} to complete. Are you sure you want to continue?",
+                HumanBytes(metadata.size as u64).to_string(),
+                HumanDuration(Duration::from_secs(metadata.size as u64 / 1024)).to_string() // The average download speed at close range is ~1 KiB/s
+            );
+            if Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default()).with_prompt(prompt).interact()? {
+                // Continue
+            } else {
+                // Abort
+                return Err(anyhow::anyhow!("Aborted download due to user request"));
+            }
+        }
+    }
+    
 
     // Write to the slot_1.ini file on the brain
     let mut fh = device.open(file_name.clone(), Some(vexv5_serial::device::VexInitialFileMetadata {
