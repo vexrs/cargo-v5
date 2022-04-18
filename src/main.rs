@@ -35,7 +35,7 @@ fn main() -> Result<()>{
 
     let device = util::find_devices()?;
 
-    let (system, user) = match device {
+    let (mut system, mut user) = match device {
         DevicePair::Double(d1, d2) => {
             (
                 (
@@ -70,7 +70,12 @@ fn main() -> Result<()>{
         }
     };
 
-    
+    // Set the DTR line to high on both ports
+    system.1.write_data_terminal_ready(true)?;
+    if let Some(ref mut user) = user {
+        user.1.write_data_terminal_ready(true)?;
+    }
+
     let mut device = VexDevice::new(system, user)?; 
     
     device.with_channel(vexv5_serial::device::V5ControllerChannel::UPLOAD, |d| {

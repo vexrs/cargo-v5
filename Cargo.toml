@@ -17,5 +17,8 @@ console = "0.15.0"
 crc = "2.1.0"
 dialoguer = "0.10.0"
 indicatif = "0.16.2"
+num = "0.4"
+num-derive = "0.3"
+num-traits = "0.2"
 serialport = "4.1.0"
 vexv5_serial = { git = "ssh://git@github.com/Culpeper-Robotics/vexv5_serial"}

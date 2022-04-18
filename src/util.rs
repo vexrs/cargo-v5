@@ -30,7 +30,7 @@ pub fn find_devices() -> Result<DevicePair> {
     for device in devices {
         match device.class {
             VexSerialClass::User => {
-                if pairs.len() > 0 {
+                if !pairs.is_empty() {
                     
                     if let DevicePair::Single(d) = pairs.last().unwrap().clone() {
                         pairs.pop();
@@ -50,10 +50,10 @@ pub fn find_devices() -> Result<DevicePair> {
     }
     
     // If there are no devices, then error
-    if pairs.len() == 0 {
+    if pairs.is_empty() {
         print!("{} ", style("Error:").red().bright());
         println!("{}", style("No Vex devices found.").black().bright());
-        return Err(anyhow::anyhow!("No Devices Found"));
+        return Err(anyhow::anyhow!("No Vex devices found"));
     }
 
     // If there is only one device, then use it.
@@ -68,7 +68,7 @@ pub fn find_devices() -> Result<DevicePair> {
             if let DevicePair::Single(d1) = pair {
                 pselect.push(format!("{:?} port: {} ({})", d1.class, d1.port_info.port_name, match d1.port_info.port_type {
                     SerialPortType::UsbPort(p) => {
-                        p.product.unwrap_or("".to_string())
+                        p.product.unwrap_or_else(||"".to_string())
                     },
                     _ => {
                         "Unsupported Device".to_string()
@@ -161,4 +161,47 @@ pub fn write_file_progress<T: Read + Write>(handle: &mut V5FileHandle<T>, data: 
     bar.finish_and_clear();
 
     Ok(how_much)
+}
+
+/// Reads data from a file on the V5 device.
+/// Same as the function provided in vexv5_serial but it shows progress to the user.
+pub fn read_file_progress<T: Read + Write>(handle: &mut V5FileHandle<T>) -> Result<Vec<u8>> {
+    // Create the buffer to store data in
+    let mut data = Vec::<u8>::new();
+
+    let max_size: u16 = 512;
+    let length = handle.transfer_metadata.file_size;
+
+    // Create the progress bar
+    let bar = ProgressBar::new(length.into());
+
+    // Style the progress bar
+    bar.set_style(ProgressStyle::default_bar()
+        .template("[{elapsed_precise}] {binary_bytes_per_sec} {bar:40.cyan/blue} {percent}% {bytes:>7}/{total_bytes:7} {msg}")
+        .progress_chars("##-"));
+
+
+    // Iterate over the file's size in steps of max_packet_size
+    for i in (0..length).step_by(max_size.into()) {
+        
+        // Find the packet size that we want to read in
+        let packet_size = if i + <u32>::from(max_size) > length {
+            <u16>::try_from(length - i)?
+        } else {
+            max_size
+        };
+        
+        // Read the data and append it to the buffer
+        data.extend(handle.read_len(i+handle.metadata.addr, (packet_size + 3) & !3)?);
+
+        // Update the progress bar
+        bar.inc(packet_size.into());
+    }
+
+    let data = data[..length as usize].to_vec();
+
+    // Finalize the progress bar
+    bar.finish_and_clear();
+    
+    Ok(data)
 }
