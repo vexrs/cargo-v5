@@ -14,6 +14,9 @@ keywords = ["vex", "v5", "robotics", "cargo", "VRC"]
 anyhow = "1.0"
 clap = { version = "3.1.9", features = ["derive"] }
 console = "0.15.0"
+crc = "2.1.0"
 dialoguer = "0.10.0"
+indicatif = "0.16.2"
 serialport = "4.1.0"
+spinners = "3.1.0"
 vexv5_serial = { git = "ssh://git@github.com/Culpeper-Robotics/vexv5_serial"}

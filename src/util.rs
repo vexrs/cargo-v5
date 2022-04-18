@@ -7,7 +7,9 @@ use dialoguer::{
     Select,
     theme::ColorfulTheme
 };
+use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::Result;
+
 
 
 #[derive(Clone, Debug)]
@@ -85,7 +87,7 @@ pub fn find_devices() -> Result<DevicePair> {
         let selection = Select::with_theme(&ColorfulTheme::default())
             .items(&pselect)
             .default(0)
-            .with_prompt("Multiple Vex devices found. Please select which one you want to use:")
+            .with_prompt("Multiple Vex devices found. Please select which one to use:")
             .interact()?;
 
         pairs[selection].clone()
@@ -94,10 +96,70 @@ pub fn find_devices() -> Result<DevicePair> {
     Ok(device)
 }
 
+/// Writes a vector up to the file length of data to the file. 
+/// Ignores any extra bytes at the end of the vector.
+/// Returns the ammount of data read
+/// Same as the function provided in vexv5_serial but it shows progress to the user.
+pub fn write_file_progress<T: Read + Write>(handle: &mut V5FileHandle<T>, data: Vec<u8>) -> Result<usize> {
 
-pub fn write_file_progress<T: Read + Write>(handle: V5FileHandle<T>) -> Result<()> {
+    // Save the max size so it is easier to access
+    // We want it to be 3/4 size so we do not have issues with packet headers
+    // going over the max size
+    let max_size = handle.transfer_metadata.max_packet_size / 
+    2 + (handle.transfer_metadata.max_packet_size / 4);
+    
+    // We will be using the length of the file in the metadata
+    // that way we do not ever write more data than is expected.
+    // However, if the vector is smaller than the file size
+    // Then use the vector size.
+    let size = if data.len() as u32 > handle.transfer_metadata.file_size {
+        handle.transfer_metadata.file_size
+    } else {
+        data.len() as u32
+    };
 
     
 
-    Ok(())
+    // We will be incrementing this variable so we know how much we have written
+    let mut how_much: usize = 0;
+    
+    // Create the progress bar
+    let bar = ProgressBar::new(size.into());
+
+    // Style the progress bar
+    bar.set_style(ProgressStyle::default_bar()
+        .template("[{elapsed_precise}] {binary_bytes_per_sec} {bar:40.cyan/blue} {percent}% {bytes:>7}/{total_bytes:7} {msg}")
+        .progress_chars("##-"));
+
+    // Iterate over the file's length in steps of max_size
+    // We will be writing each iteration.
+    for i in (0..size as usize).step_by(max_size.into()) {
+        // Determine the packet size. We do not want to write
+        // max_size bytes if we are at the end of the file
+        let packet_size = if size < max_size as u32 {
+            size as u16
+        } else if i as u32 + max_size as u32 > size {
+            (size - i as u32) as u16
+        } else {
+            max_size
+        };
+
+        // Cut out packet_size bytes out of the provided buffer
+        let payload = data[i..i+packet_size as usize].to_vec();
+
+        // Write the payload to the file
+        handle.write_some(handle.metadata.addr + i as u32, payload)?;
+
+        // Update the progress bar
+        bar.inc(packet_size.into());
+
+        // Increment how_much by packet data so we know how much we
+        // have written to the file
+        how_much += packet_size as usize;
+    }
+
+    // Finalize the progress bar
+    bar.finish();
+
+    Ok(how_much)
 }
