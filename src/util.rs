@@ -1,7 +1,7 @@
 use std::{io::{Read, Write}, time::Duration};
 
 use serialport::{SerialPortType, SerialPort};
-use vexv5_serial::{ports::{VexSerialInfo, VexSerialClass}, device::{V5FileHandle, VexDevice}};
+use vexv5_serial::{ports::{VexSerialInfo, VexSerialClass}, device::{V5FileHandle}};
 use console::style;
 use dialoguer::{
     Select,
