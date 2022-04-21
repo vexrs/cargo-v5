@@ -72,10 +72,14 @@ fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
             // so just print it.
             if decoded.starts_with(b"sout") {
                 print!("{}", decoded[4..].as_ascii_str()?);
+                // Flush stdout just in case the output of the program does not contain a newline.
+                std::io::stdout().flush()?;
+            } else {
+                // If not, print it raw
+                print!("{}", decoded.as_ascii_str()?);
             }
 
-            // If not, print it raw
-            print!("{}", decoded.as_ascii_str()?);
+            
         }
     })?;
     Ok(())

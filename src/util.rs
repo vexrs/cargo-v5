@@ -263,9 +263,8 @@ pub fn read_cobs_packet<T: Read + Write>(device: &mut VexDevice<T>, buf: &mut Ve
     // Read in data so long as there are no 0x00 bytes in the buffer
     while !buf.contains(&0x00) {
         buf.extend(device.read_serial(0)?);
-        println!("{:?}", buf);
     }
-
+    
     // Find the index of the first 0x00 byte and split it off
     let pos = buf.iter().position(|&r| r == 0x00).unwrap();
     let data: Vec<u8> = buf.drain(0..pos).collect();
@@ -277,6 +276,6 @@ pub fn read_cobs_packet<T: Read + Write>(device: &mut VexDevice<T>, buf: &mut Ve
     
     // COBS decode the data.
     let decoded = cobs::cobsr::decode_vector(&data)?;
-
+    
     Ok(decoded)
 }
