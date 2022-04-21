@@ -1,3 +1,5 @@
+use std::io::{Read, Write};
+
 use anyhow::Result;
 use ascii::AsAsciiStr;
 use clap::{Parser, Subcommand};
@@ -57,7 +59,7 @@ struct CargoToml {
 }
 
 
-fn terminal<T: Read+Write>s(&mut device: VexDevice<T>) -> Result<()> {
+fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
     // We want to use a download channel
     device.with_channel(V5ControllerChannel::UPLOAD, |device| {
         // Use a buffer to store data that will be read into COBS packets.
@@ -92,7 +94,7 @@ fn main() -> Result<()>{
     match args.command {
         Commands::Terminal {} => {
             // Constantly read and print data
-            terminal()?;
+            terminal(&mut device)?;
             
             
         },
@@ -188,7 +190,7 @@ fn main() -> Result<()>{
             device.execute_program_file(format!("slot_{}.bin", slot+1), None, None)?;
 
             // Open terminal
-            terminal()?;
+            terminal(&mut device)?;
         }
     }
 
