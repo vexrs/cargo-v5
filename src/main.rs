@@ -80,8 +80,19 @@ fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
 
 fn main() -> Result<()>{
     
-    // Parse arguments
-    let args = Args::parse();
+    let args: Vec<String> = std::env::args().collect();
+
+    // If argument 1 is cargo then remove it
+    let args = if args.len() < 2 {
+        args
+    } else if args[1] == "v5" {
+        args[1..].to_vec()
+    } else {
+        args
+    };
+
+    // Parse the args
+    let args = Args::parse_from(args);
 
     // Find and prepare the raw device to use
     let device = util::find_devices()?;
