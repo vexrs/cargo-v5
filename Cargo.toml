@@ -12,13 +12,18 @@ keywords = ["vex", "v5", "robotics", "cargo", "VRC"]
 
 [dependencies]
 anyhow = "1.0"
+ascii = "1.0.0"
+chrono = "0.4"
 clap = { version = "3.1.9", features = ["derive"] }
 console = "0.15.0"
+cobs = { git = "ssh://git@github.com/cmcqueen/cobs-rs.git" }
 crc = "2.1.0"
 dialoguer = "0.10.0"
 indicatif = "0.16.2"
 num = "0.4"
 num-derive = "0.3"
 num-traits = "0.2"
+serde = { version = "1.0", features = ["derive"] }
 serialport = "4.1.0"
+toml = "0.5.8"
 vexv5_serial = { git = "ssh://git@github.com/Culpeper-Robotics/vexv5_serial"}

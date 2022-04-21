@@ -1,7 +1,7 @@
 use std::{io::{Read, Write}, time::Duration};
 
 use serialport::{SerialPortType, SerialPort};
-use vexv5_serial::{ports::{VexSerialInfo, VexSerialClass}, device::V5FileHandle};
+use vexv5_serial::{ports::{VexSerialInfo, VexSerialClass}, device::{V5FileHandle, VexDevice}};
 use console::style;
 use dialoguer::{
     Select,
@@ -254,4 +254,28 @@ pub fn read_file_progress<T: Read + Write>(handle: &mut V5FileHandle<T>) -> Resu
     bar.finish_and_clear();
     
     Ok(data)
+}
+
+/// Reads in a COBS packet. Requires a data buffer to be provided as well as a device to read data from
+pub fn read_cobs_packet<T: Read + Write>(device: &mut VexDevice<T>, buf: &mut Vec<u8>) -> Result<Vec<u8>> {
+    
+
+    // Read in data so long as there are no 0x00 bytes in the buffer
+    while !buf.contains(&0x00) {
+        buf.extend(device.read_serial(0)?);
+    }
+
+    // Find the index of the first 0x00 byte and split it off
+    let pos = buf.iter().position(|&r| r == 0x00).unwrap();
+    let data: Vec<u8> = buf.drain(0..pos).collect();
+    
+    // If there is still more data on the buffer, pop the last zero
+    if !buf.is_empty() {
+        buf.drain(0..1).for_each(drop);
+    }
+    
+    // COBS decode the data.
+    let decoded = cobs::cobsr::decode_vector(&data)?;
+
+    Ok(decoded)
 }

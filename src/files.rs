@@ -17,8 +17,8 @@ pub fn upload_file<T: Read + Write>(device: &mut VexDevice<T>, file_name: String
         if data.len() > 16384 {
             let prompt = format!(
                 "You are uploading a large ({}) file wirelessly. This is projected to take {} to complete. Are you sure you want to continue?",
-                HumanBytes(data.len() as u64).to_string(),
-                HumanDuration(Duration::from_secs(data.len() as u64 / 1024)).to_string() // The average download speed at close range is ~1 KiB/s
+                HumanBytes(data.len() as u64),
+                HumanDuration(Duration::from_secs(data.len() as u64 / 1024)) // The average download speed at close range is ~1 KiB/s
             );
             if Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default()).with_prompt(prompt).interact()? {
                 // Continue
@@ -105,8 +105,8 @@ pub fn download_file<T: Read + Write>(device: &mut VexDevice<T>, file_name: Stri
         if metadata.size > 16384 {
             let prompt = format!(
                 "You are downloading a large ({}) file wirelessly. This is projected to take {} to complete. Are you sure you want to continue?",
-                HumanBytes(metadata.size as u64).to_string(),
-                HumanDuration(Duration::from_secs(metadata.size as u64 / 1024)).to_string() // The average download speed at close range is ~1 KiB/s
+                HumanBytes(metadata.size as u64),
+                HumanDuration(Duration::from_secs(metadata.size as u64 / 1024)) // The average download speed at close range is ~1 KiB/s
             );
             if Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default()).with_prompt(prompt).interact()? {
                 // Continue
