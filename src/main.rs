@@ -57,8 +57,24 @@ struct CargoToml {
 }
 
 
+fn terminal<T: Read+Write>s(&mut device: VexDevice<T>) -> Result<()> {
+    // We want to use a download channel
+    device.with_channel(V5ControllerChannel::UPLOAD, |device| {
+        // Use a buffer to store data that will be read into COBS packets.
+        let mut buf = Vec::<u8>::new();
+        loop {
+            // Read in the COBS packet.
+            let decoded = read_cobs_packet(device, &mut buf)?;
 
-
+            // If it starts with `sout` we know it is PROS
+            // so just print it.
+            if decoded.starts_with(b"sout") {
+                print!("{}", decoded[4..].as_ascii_str()?);
+            }
+        }
+    })?;
+    Ok(())
+}
 
 fn main() -> Result<()>{
     
@@ -76,23 +92,7 @@ fn main() -> Result<()>{
     match args.command {
         Commands::Terminal {} => {
             // Constantly read and print data
-
-            
-            // We want to use a download channel
-            device.with_channel(V5ControllerChannel::UPLOAD, |device| {
-                // Use a buffer to store data that will be read into COBS packets.
-                let mut buf = Vec::<u8>::new();
-                loop {
-                    // Read in the COBS packet.
-                    let decoded = read_cobs_packet(device, &mut buf)?;
-
-                    // If it starts with `sout` we know it is PROS
-                    // so just print it.
-                    if decoded.starts_with(b"sout") {
-                        print!("{}", decoded[4..].as_ascii_str()?);
-                    }
-                }
-            })?;
+            terminal()?;
             
             
         },
@@ -183,6 +183,12 @@ fn main() -> Result<()>{
 
             // Upload it to the brain
             files::upload_file(&mut device, format!("slot_{}.bin", slot+1), data)?;
+
+            // Run the program file
+            device.execute_program_file(format!("slot_{}.bin", slot+1), None, None)?;
+
+            // Open terminal
+            terminal()?;
         }
     }
 
