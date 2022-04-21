@@ -13,6 +13,7 @@ keywords = ["vex", "v5", "robotics", "cargo", "VRC"]
 [dependencies]
 anyhow = "1.0"
 ascii = "1.0.0"
+ceros-serial = { git = "ssh://git@github.com/Culpeper-Robotics/ceros-serial.git", features=["use_std"] }
 chrono = "0.4"
 clap = { version = "3.1.9", features = ["derive"] }
 console = "0.15.0"

@@ -62,24 +62,15 @@ struct CargoToml {
 fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
     // We want to use a download channel
     device.with_channel(V5ControllerChannel::UPLOAD, |device| {
-        // Use a buffer to store data that will be read into COBS packets.
-        let mut buf = Vec::<u8>::new();
+        let mut serial = ceros_serial::protocol::CEROSSerial::new(device);
         loop {
-            // Read in the COBS packet.
-            let decoded = read_cobs_packet(device, &mut buf)?;
+            // Read in serial data
+            let (data_type, data) = serial.read_data();
 
-            // If it starts with `sout` we know it is PROS
-            // so just print it.
-            if decoded.starts_with(b"sout") {
-                print!("{}", decoded[4..].as_ascii_str()?);
-                // Flush stdout just in case the output of the program does not contain a newline.
-                std::io::stdout().flush()?;
-            } else {
-                // If not, print it raw
-                print!("{}", decoded.as_ascii_str()?);
+            // Print the data if we need to print
+            if let ceros_serial::protocol::DataType::Print = data_type {
+                print!("{}", data.as_ascii_str()?);
             }
-
-            
         }
     })?;
     Ok(())
