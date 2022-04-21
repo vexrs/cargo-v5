@@ -5,12 +5,10 @@ use ascii::AsAsciiStr;
 use clap::{Parser, Subcommand};
 use chrono::prelude::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
-
+use ceros_serial::protocol::CEROSSerial;
 use vexv5_serial::device::{VexDevice, V5ControllerChannel};
 
 
-
-use crate::util::read_cobs_packet;
 
 
 mod util;
@@ -62,14 +60,17 @@ struct CargoToml {
 fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
     // We want to use a download channel
     device.with_channel(V5ControllerChannel::UPLOAD, |device| {
-        let mut serial = ceros_serial::protocol::CEROSSerial::new(device);
+        let mut buf = Vec::<u8>::new();
+        let mut serial = CEROSSerial::new(device);
         loop {
-            // Read in serial data
+            
             let (data_type, data) = serial.read_data();
-
+            
+            
             // Print the data if we need to print
             if let ceros_serial::protocol::DataType::Print = data_type {
                 print!("{}", data.as_ascii_str()?);
+                std::io::stdout().flush()?;
             }
         }
     })?;
