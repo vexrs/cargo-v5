@@ -60,7 +60,7 @@ struct CargoToml {
 fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
     // We want to use a download channel
     device.with_channel(V5ControllerChannel::UPLOAD, |device| {
-        let mut buf = Vec::<u8>::new();
+        
         let mut serial = CEROSSerial::new(device);
         loop {
             
@@ -69,7 +69,7 @@ fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
             
             // Print the data if we need to print
             if let ceros_serial::protocol::DataType::Print = data_type {
-                print!("{}", data.as_ascii_str()?);
+                print!("{}", std::str::from_utf8(&data)?);
                 std::io::stdout().flush()?;
             }
         }
