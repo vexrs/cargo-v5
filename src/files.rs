@@ -14,7 +14,7 @@ pub fn upload_file<T: Read + Write>(device: &mut VexDevice<T>, file_name: String
     // If the file size is too large (lets say 16 KiB) and the device is a controller
     // then prompt before downloading.
     if let V5DeviceVersion{system_version: _, product_type: VexProduct::V5Controller(_) } = device.get_device_version()? {
-        if data.len() > 16384 {
+        if data.len() > 64000 {
             let prompt = format!(
                 "You are uploading a large ({}) file wirelessly. This is projected to take {} to complete. Are you sure you want to continue?",
                 HumanBytes(data.len() as u64),
@@ -102,7 +102,7 @@ pub fn download_file<T: Read + Write>(device: &mut VexDevice<T>, file_name: Stri
     // If the file size is too large (lets say 16 KiB) and the device is a controller
     // then prompt before downloading.
     if let V5DeviceVersion{system_version: _, product_type: VexProduct::V5Controller(_) } = device.get_device_version()? {
-        if metadata.size > 16384 {
+        if metadata.size > 64000 {
             let prompt = format!(
                 "You are downloading a large ({}) file wirelessly. This is projected to take {} to complete. Are you sure you want to continue?",
                 HumanBytes(metadata.size as u64),
