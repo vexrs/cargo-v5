@@ -64,12 +64,12 @@ fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
         let mut serial = CEROSSerial::new(device);
         loop {
             
-            let (data_type, data) = serial.read_data();
+            let data_type = serial.read_data()?;
             
             
             // Print the data if we need to print
-            if let ceros_serial::protocol::DataType::Print = data_type {
-                print!("{}", std::str::from_utf8(&data)?);
+            if let ceros_serial::data::DataType::Print(d) = data_type {
+                print!("{}", std::str::from_utf8(&d)?);
                 std::io::stdout().flush()?;
             }
         }
