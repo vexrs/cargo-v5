@@ -1,6 +1,6 @@
 # cargo-v5
-![GitHub](https://img.shields.io/github/license/Culpeper-Robotics/cargo-v5?style=flat-square)
-![GitHub repo size](https://img.shields.io/github/repo-size/Culpeper-Robotics/cargo-v5?style=flat-square)
+![GitHub](https://img.shields.io/github/license/ceros-os/cargo-v5?style=flat-square)
+![GitHub repo size](https://img.shields.io/github/repo-size/ceros-os/cargo-v5?style=flat-square)
 ![Crates.io](https://img.shields.io/crates/v/cargo-v5?style=flat-square)
 ![Libraries.io dependency status for latest release](https://img.shields.io/librariesio/release/cargo/cargo-v5?style=flat-square)
 
@@ -22,13 +22,15 @@ wget https://gist.githubusercontent.com/wireboy5/5bb41fe7bc8a0469635e56a3076946b
 You can also add these contents to your cargo config file for convienience:
 ```toml
 [build]
-target = ".v5/armv7a-vex-eabi.json"
+target = "build/armv7a-vex-eabi.json"
 
 [unstable]
-build-std = ["core", "alloc"]
+build-std-features = ["compiler-builtins-mem", "compiler-builtins-mangled-names"]
+build-std = ["core", "alloc", "compiler_builtins"]
 
 [target.armv7a-vex-eabi]
-runner = "cargo v5 upload --run"
+runner = "cargo v5 cargo-hook"
+
 ```
 
 Now if you run `cargo run` it will compile and run your project on the v5 brain.
