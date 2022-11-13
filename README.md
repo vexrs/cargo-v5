@@ -1,6 +1,6 @@
 # cargo-v5
-![GitHub](https://img.shields.io/github/license/ceros-os/cargo-v5?style=flat-square)
-![GitHub repo size](https://img.shields.io/github/repo-size/ceros-os/cargo-v5?style=flat-square)
+![GitHub](https://img.shields.io/github/license/vexrs-os/cargo-v5?style=flat-square)
+![GitHub repo size](https://img.shields.io/github/repo-size/vexrs-os/cargo-v5?style=flat-square)
 ![Crates.io](https://img.shields.io/crates/v/cargo-v5?style=flat-square)
 ![Libraries.io dependency status for latest release](https://img.shields.io/librariesio/release/cargo/cargo-v5?style=flat-square)
 

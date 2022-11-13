@@ -5,7 +5,7 @@ use ascii::AsAsciiStr;
 use clap::{Parser, Subcommand};
 use chrono::prelude::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
-use ceros_serial::protocol::CEROSSerial;
+use vexrs_serial::protocol::VexrsSerial;
 use vexv5_serial::device::{VexDevice, V5ControllerChannel};
 
 
@@ -61,14 +61,14 @@ fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
     // We want to use a download channel
     device.with_channel(V5ControllerChannel::UPLOAD, |device| {
         
-        let mut serial = CEROSSerial::new(device);
+        let mut serial = VexrsSerial::new(device);
         loop {
             
             let data_type = serial.read_data()?;
             
             
             // Print the data if we need to print
-            if let ceros_serial::data::DataType::Print(d) = data_type {
+            if let vexrs_serial::data::DataType::Print(d) = data_type {
                 print!("{}", std::str::from_utf8(&d)?);
                 std::io::stdout().flush()?;
             }
