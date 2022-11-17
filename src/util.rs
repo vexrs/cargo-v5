@@ -177,7 +177,7 @@ pub fn write_file_progress<T: Read + Write>(handle: &mut V5FileHandle<T>, data: 
 
     // Style the progress bar
     bar.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed_precise}] {binary_bytes_per_sec} {bar:40.cyan/blue} {percent}% {bytes:>7}/{total_bytes:7} {msg}")
+        .template("[{elapsed_precise}] {binary_bytes_per_sec} {bar:40.cyan/blue} {percent}% {bytes:>7}/{total_bytes:7} {msg}")?
         .progress_chars("##-"));
 
     // Iterate over the file's length in steps of max_size
@@ -227,7 +227,7 @@ pub fn read_file_progress<T: Read + Write>(handle: &mut V5FileHandle<T>) -> Resu
 
     // Style the progress bar
     bar.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed_precise}] {binary_bytes_per_sec} {bar:40.cyan/blue} {percent}% {bytes:>7}/{total_bytes:7} {msg}")
+        .template("[{elapsed_precise}] {binary_bytes_per_sec} {bar:40.cyan/blue} {percent}% {bytes:>7}/{total_bytes:7} {msg}")?
         .progress_chars("##-"));
 
 

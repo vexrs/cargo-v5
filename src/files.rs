@@ -63,7 +63,7 @@ pub fn upload_file<T: Read + Write>(device: &mut VexDevice<T>, file_name: String
     //let sp = Spinner::with_timer(Spinners::Dots, "Closing file handle".to_string());
     let sp = ProgressBar::new_spinner();
     sp.set_message("Closing file handle");
-    sp.enable_steady_tick(100);
+    sp.enable_steady_tick(std::time::Duration::from_millis(100));
 
     // Close file
     fh.close(vexv5_serial::device::VexFiletransferFinished::ShowRunScreen)?;
@@ -146,7 +146,7 @@ pub fn download_file<T: Read + Write>(device: &mut VexDevice<T>, file_name: Stri
     //let sp = Spinner::with_timer(Spinners::Dots, "Closing file handle".to_string());
     let sp = ProgressBar::new_spinner();
     sp.set_message("Closing file handle");
-    sp.enable_steady_tick(100);
+    sp.enable_steady_tick(std::time::Duration::from_millis(100));
 
     // Close file
     fh.close(vexv5_serial::device::VexFiletransferFinished::ShowRunScreen)?;

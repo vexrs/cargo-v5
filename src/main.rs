@@ -66,7 +66,6 @@ fn terminal<T: Read+Write>(device: &mut VexDevice<T>) -> Result<()> {
             
             let data_type = serial.read_data()?;
             
-            
             // Print the data if we need to print
             if let vexrs_serial::data::DataType::Print(d) = data_type {
                 print!("{}", std::str::from_utf8(&d)?);
