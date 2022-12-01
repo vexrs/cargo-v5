@@ -141,7 +141,11 @@ fn main() -> Result<()>{
             std::fs::write(file, data)?;
         },
         Commands::Upload { file } => {
-            //file::upload_file(file)?;
+            // Read the data from disk
+            let data = std::fs::read(file.clone())?;
+
+            // Upload the file
+            file::upload_file(&mut device, file, data, vexv5_serial::file::FTComplete::DoNothing)?;
         },
         Commands::CargoHook { file } => todo!(),
         Commands::DeviceInfo => {
