@@ -1,5 +1,6 @@
 mod cargo_toml;
 mod device_commands;
+mod file;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -16,7 +17,7 @@ struct Args {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Opens a terminal connection to the v5 brain
-    Terminal {},
+    Terminal,
     /// Downloads a file from the brain
     Download {
         /// The file to download
@@ -129,9 +130,19 @@ fn main() -> Result<()>{
 
     // Run the proper commands
     match args.command {
-        Commands::Terminal {  } => todo!(),
-        Commands::Download { file } => todo!(),
-        Commands::Upload { file } => todo!(),
+        Commands::Terminal => {
+            device_commands::terminal(&mut device)?;
+        },
+        Commands::Download { file } => {
+            // Download the file
+            let data = file::download_file(&mut device, file.clone())?;
+
+            // Write the file to disk
+            std::fs::write(file, data)?;
+        },
+        Commands::Upload { file } => {
+            //file::upload_file(file)?;
+        },
         Commands::CargoHook { file } => todo!(),
         Commands::DeviceInfo => {
             device_commands::device_info(&mut device)?;
