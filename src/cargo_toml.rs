@@ -5,14 +5,14 @@ use serde::{Serialize,Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Package {
-    name: String,
-    version: String,
-    description: Option<String>,
+    pub name: String,
+    pub version: String,
+    pub description: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CargoToml {
-    package: Package,
+    pub package: Package,
 }
 
 impl Default for CargoToml {
