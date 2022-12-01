@@ -135,7 +135,7 @@ fn main() -> Result<()>{
         },
         Commands::Download { file } => {
             // Download the file
-            let data = file::download_file(&mut device, file.clone())?;
+            let data = file::download_file(&mut device, file.clone(), vexv5_serial::file::FTComplete::DoNothing)?;
 
             // Write the file to disk
             std::fs::write(file, data)?;

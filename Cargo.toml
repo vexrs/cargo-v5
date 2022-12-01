@@ -15,6 +15,8 @@ anyhow = "1.0"
 clap = { version = "4.0.26", features = ["derive"] }
 console = "0.15.0"
 dialoguer = "0.10.0"
+indicatif = "0.17.2"
+
 vexv5_serial = { git = "ssh://git@github.com/vexrs/vexv5_serial.git", branch = "redux" }
 vexrs-serial = { git = "ssh://git@github.com/vexrs/vexrs-serial.git" }
 
