@@ -19,7 +19,7 @@ indicatif = "0.17.2"
 crc = "3.0.0"
 chrono = "0.4"
 
-vexv5_serial = { git = "ssh://git@github.com/vexrs/vexv5_serial.git", branch = "redux" }
+vexv5_serial = { git = "ssh://git@github.com/vexrs/vexv5_serial.git" }
 vexrs-serial = { git = "ssh://git@github.com/vexrs/vexrs-serial.git" }
 
 toml = "0.5.8"

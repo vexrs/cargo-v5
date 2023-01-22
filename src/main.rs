@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 use console::style;
 
 use chrono::prelude::{DateTime, Utc};
+use vexv5_serial::devices::VexDeviceType;
 
 
 #[derive(Parser, Debug)]
@@ -67,52 +68,37 @@ fn main() -> Result<()>{
     let cargo_file = cargo_toml::parse_cargo_toml()?;
 
     // Find all vex devices
-    let devices = match vexv5_serial::get_socket_info_pairs() {
-        Ok(v) => v,
-        Err(e) => {
-            print!("{} ", style("Error:").red().bright());
-            println!("{}", style("Error discovering vex devices:").black().bright());
-            return Err(e.into());
-        }
-    };
-
-    // If there are no devices, then exit
-    if devices.len() == 0 {
-        print!("{} ", style("Error:").red().bright());
-        println!("{}", style("No Vex devices found.").black().bright());
-        // No error here because error was already printed
-        return Ok(());
-    }
+    let devices = vexv5_serial::devices::genericv5::find_generic_devices()?;
 
     // If there is more than one, prompt for which one should be used
     let device = if devices.len() > 1 {
         &devices[dialoguer::Select::with_theme(&dialoguer::theme::ColorfulTheme::default())
             .items(&devices.iter().map(|v| {
-                match v {
-                    vexv5_serial::SocketInfoPairs::UserSystem(u, s) => {
+                match v.device_type {
+                    VexDeviceType::Brain => {
                         format!("{} {} {} {} {} {}", 
                             style("V5 Brain").blue().bold(),
                             style("-").black().bright(),
                             style("System:").green().bright(),
-                            style(s.port_info.port_name.as_str()).yellow().bright(),
+                            style(v.system_port.clone()).yellow().bright(),
                             style("User:").green().bright(),
-                            style(u.port_info.port_name.as_str()).yellow().bright(),
+                            style(v.user_port.as_ref().unwrap().clone()).yellow().bright(),
                         ).to_string()
                     },
-                    vexv5_serial::SocketInfoPairs::Controller(s) => {
+                    VexDeviceType::Controller => {
                         format!("{} {} {} {}", 
                             style("V5 Controller").blue().bold(),
                             style("-").black().bright(),
                             style("System:").green().bright(),
-                            style(s.port_info.port_name.as_str()).yellow().bright(),
+                            style(v.system_port.clone()).yellow().bright(),
                         ).to_string()
                     },
-                    vexv5_serial::SocketInfoPairs::SystemOnly(s) => {
+                    VexDeviceType::Unknown => {
                         format!("{} {} {} {}", 
                             style("Unknown VEX Device").red().bold(),
                             style("-").black().bright(),
                             style("System:").green().bright(),
-                            style(s.port_info.port_name.as_str()).yellow().bright(),
+                            style(v.system_port.clone()).yellow().bright(),
                         ).to_string()
                     },
                     
@@ -125,10 +111,7 @@ fn main() -> Result<()>{
     };
 
     // Open the vex device
-    let device = vexv5_serial::open_device(device)?;
-
-    // Wrap the serial port with a device structure
-    let mut device = vexv5_serial::Device::new(device.0, device.1);
+    let mut device = device.open()?;
 
     // Run the proper commands
     match args.command {
@@ -209,17 +192,20 @@ fn main() -> Result<()>{
             // Convert to bytes
             let ini: Vec<u8> = ini.as_bytes().to_vec();
 
-            // Upload the file
-            file::upload_file(&mut device, format!("slot_{}.ini", slot+1), ini, vexv5_serial::file::FTComplete::DoNothing)?;
-
-            // Read in the file to upload
+            // Read in the bin file to upload
             let data = std::fs::read(upload_file)?;
 
             // Upload it to the brain
             file::upload_file(&mut device, format!("slot_{}.bin", slot+1), data, vexv5_serial::file::FTComplete::RunProgram)?;
 
+            
+            // Upload the ini file
+            file::upload_file(&mut device, format!("slot_{}.ini", slot+1), ini, vexv5_serial::file::FTComplete::DoNothing)?;
+
             // Open terminal
             device_commands::terminal(&mut device)?;
+
+           
         },
         Commands::DeviceInfo => {
             device_commands::device_info(&mut device)?;

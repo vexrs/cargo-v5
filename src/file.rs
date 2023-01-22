@@ -3,7 +3,7 @@ use std::{io::{Write, Read}};
 use console::style;
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressStyle};
-use vexv5_serial::{Device, file::{FTInit, FTVID, FTTarget, FTFunction, FTOptions, FTExit, FTComplete, FTRead, FTWrite, FTInitResponse, FTType}};
+use vexv5_serial::{devices::device::Device, file::{FTInit, FTVID, FTTarget, FTFunction, FTOptions, FTExit, FTComplete, FTRead, FTWrite, FTInitResponse, FTType}};
 
 use crate::device_commands::with_channel;
 

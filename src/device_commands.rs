@@ -1,7 +1,7 @@
 use std::io::{Write, Read};
 
 use console::style;
-use vexv5_serial::{Device, remote::{SwitchChannel, V5ControllerChannel}};
+use vexv5_serial::{devices::device::Device, remote::{SwitchChannel, V5ControllerChannel}};
 use anyhow::Result;
 
 /// Uses a specific controller channel while inside of the provided closure
@@ -25,7 +25,7 @@ where U: Read+Write, S: Read + Write, F: Fn(&mut Device<U, S>) -> Result<R> {
     r
 }
 
-pub fn device_info<S: Read+Write, U: Read+Write>(device: &mut vexv5_serial::Device<S, U>) -> anyhow::Result<()> {
+pub fn device_info<S: Read+Write, U: Read+Write>(device: &mut Device<S, U>) -> anyhow::Result<()> {
     // Get the vex device system info
     let info = device.send_request(vexv5_serial::system::GetSystemVersion())?;
 
@@ -61,27 +61,38 @@ pub fn device_info<S: Read+Write, U: Read+Write>(device: &mut vexv5_serial::Devi
     Ok(())
 }
 
+fn wrapped_terminal<U: Read+Write, S: Read+Write>(device: &mut Device<U, S>) -> Result<()> {
+    // Use VexrsSerial
+    let mut serial = vexrs_serial::protocol::VexrsSerial::new(device);
+    
+    // Loop forever
+    loop {
+        // Read in data
+        let data = serial.read_data()?;
+
+        // If it should be printed, then print it and flush stdout
+        if let vexrs_serial::data::DataType::Print(d) = data {
+            print!("{}", std::str::from_utf8(&d)?);
+            std::io::stdout().flush()?;
+        }
+
+    }
+
+    Ok(())
+}
+
 pub fn terminal<U: Read+Write, S: Read+Write>(device: &mut Device<U, S>) -> Result<()> {
 
     // Use the download channel if this is a controller
-    with_channel(device, V5ControllerChannel::Download, |d| -> Result<()> {
-
-        // Use VexrsSerial
-        let mut serial = vexrs_serial::protocol::VexrsSerial::new(d);
-
-        // Loop forever
-        loop {
-            // Read in data
-            let data = serial.read_data()?;
-
-            // If it should be printed, then print it and flush stdout
-            if let vexrs_serial::data::DataType::Print(d) = data {
-                print!("{}", std::str::from_utf8(&d)?);
-                std::io::stdout().flush()?;
-            }
-
-        }
-    })?;
+    if device.is_controller()? {
+        with_channel(device, V5ControllerChannel::Download, |d| -> Result<()> {
+            wrapped_terminal(d)
+        })?;
+    } else {
+        
+        wrapped_terminal(device)?;
+    }
+    
 
     Ok(())
 }
